@@ -100,6 +100,15 @@ public class LegCommand implements CommandExecutor {
                     + formatDouble(ability.getDurationTicks() / 20.0D) + " сек)");
             sender.sendMessage("§7Бонус зеркального урона: §e+" + formatDouble(ability.getBonusDamagePercent()) + "%");
             sender.sendMessage("§7Прямой урон ударом: " + (ability.isCancelHitDamage() ? "§cотменяется" : "§aнаносится"));
+        } else if (definition.isShrinkRay() && ability != null) {
+            sender.sendMessage("§7Эффект: §fShift + ПКМ уменьшает тебя, обычный ПКМ стреляет лучом по игроку.");
+            sender.sendMessage("§7Длительность: §e" + ability.getDurationTicks() + " тиков §8("
+                    + formatDouble(ability.getDurationTicks() / 20.0D) + " сек)");
+            sender.sendMessage("§7Высота владельца: §e" + formatDouble(ability.getSelfHeightBlocks()) + " блока");
+            sender.sendMessage("§7Высота цели: §e" + formatDouble(ability.getTargetHeightBlocks()) + " блока");
+            sender.sendMessage("§7Дальность луча: §e" + formatDouble(ability.getRayRange()) + " блоков");
+            sender.sendMessage("§7Себе эффект: " + readablePotionBoost(ability.isSelfSpeedEffect(), "Скорость", ability.getSelfSpeedAmplifier()));
+            sender.sendMessage("§7Цели эффект: " + readablePotionBoost(ability.isTargetSlownessEffect(), "Замедление", ability.getTargetSlownessAmplifier()));
         }
 
         sender.sendMessage("§7Описание:");
@@ -174,7 +183,36 @@ public class LegCommand implements CommandExecutor {
         if (definition.isVoodooDoll()) {
             return "Кукла Вуду";
         }
+        if (definition.isShrinkRay()) {
+            return "Shrink Ray";
+        }
         return definition.getType().toLowerCase(Locale.ROOT);
+    }
+
+    private String readablePotionBoost(boolean enabled, String name, int amplifier) {
+        if (!enabled) {
+            return "§7нет";
+        }
+        return "§e" + name + " " + roman(amplifier + 1);
+    }
+
+    private String roman(int value) {
+        if (value <= 1) {
+            return "I";
+        }
+        if (value == 2) {
+            return "II";
+        }
+        if (value == 3) {
+            return "III";
+        }
+        if (value == 4) {
+            return "IV";
+        }
+        if (value == 5) {
+            return "V";
+        }
+        return String.valueOf(value);
     }
 
     private String formatDouble(double value) {
