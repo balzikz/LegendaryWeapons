@@ -547,4 +547,44 @@ public class ShrinkRayManager {
         private final Effect previousSlowness;
         private final boolean selfSpeedEffect;
         private final int selfSpeedAmplifier;
-        private final boolean targetSlownessEff
+        private final boolean targetSlownessEffect;
+        private final int targetSlownessAmplifier;
+        private long expiresAtMillis;
+        private long lastNoSpaceNoticeMillis;
+
+        private ActiveScale(UUID targetId,
+                            UUID casterId,
+                            String weaponId,
+                            String targetWorld,
+                            String casterWorld,
+                            double previousScale,
+                            double appliedScale,
+                            ScaleMode mode,
+                            long startedAtMillis,
+                            long expiresAtMillis,
+                            Effect previousSpeed,
+                            Effect previousSlowness,
+                            boolean selfSpeedEffect,
+                            int selfSpeedAmplifier,
+                            boolean targetSlownessEffect,
+                            int targetSlownessAmplifier) {
+            this.targetId = targetId;
+            this.casterId = casterId;
+            this.weaponId = weaponId;
+            this.targetWorld = targetWorld;
+            this.casterWorld = casterWorld;
+            this.previousScale = previousScale;
+            this.appliedScale = appliedScale;
+            this.mode = mode;
+            this.startedAtMillis = startedAtMillis;
+            this.expiresAtMillis = expiresAtMillis;
+            this.previousSpeed = previousSpeed;
+            this.previousSlowness = previousSlowness;
+            this.selfSpeedEffect = selfSpeedEffect;
+            this.selfSpeedAmplifier = selfSpeedAmplifier;
+            this.targetSlownessEffect = targetSlownessEffect;
+            this.targetSlownessAmplifier = targetSlownessAmplifier;
+            this.lastNoSpaceNoticeMillis = 0L;
+        }
+    }
+}
