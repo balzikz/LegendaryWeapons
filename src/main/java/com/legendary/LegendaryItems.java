@@ -11,7 +11,7 @@ import com.legendary.manager.LegendaryCraftManager;
 import com.legendary.manager.ShrinkRayManager;
 import com.legendary.manager.VoodooManager;
 
-public 1 LegendaryItems extends PluginBase {
+public class LegendaryItems extends PluginBase {
 
     private static LegendaryItems instance;
 
