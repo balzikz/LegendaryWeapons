@@ -1,8 +1,9 @@
 # ======================================================
 # LegendaryItems / config.yml
-# MVP-версия под Battle Royale
-# Пока здесь только первое оружие: Гарпун
+# Battle Royale легендарки для NukkitMOT
 # ======================================================
+# cooldown-ticks / duration-ticks указаны в тиках.
+# 20 тиков = 1 секунда.
 
 weapons:
   harpoon:
@@ -13,8 +14,6 @@ weapons:
     once-per-world: true
 
     item:
-      # Для MVP берём обычную удочку как основу.
-      # Потом можно легко заменить на любой другой item id.
       material: "minecraft:fishing_rod"
       name: "§6§lГарпун"
       lore:
@@ -36,36 +35,88 @@ weapons:
         R: "minecraft:stick"
 
     ability:
-      # 20 тиков = 1 секунда
       cooldown-ticks: 60
-
-      # Скорость снежка-крюка
       projectile-speed: 1.8
-
-      # Базовая сила притягивания
       pull-speed: 1.15
-
-      # Сколько максимум живёт выпущенный крюк
       max-flight-ticks: 40
-
-      # Сколько максимум тиков идёт подтягивание
       max-pull-ticks: 80
-
-      # Когда считаем, что цель уже достигнута
       min-distance: 1.75
-
-      # Ограничитель вертикального импульса вверх
       vertical-cap: 0.95
-
-      # Помощь при подъёме на край/уступ, чтобы меньше застревать
       step-boost: 0.42
-
-      # Если прогресс к точке не идёт слишком долго — останавливаем безопасно
       stuck-ticks: 14
-
-      # Защита от урона падением после завершения притягивания
       fall-immunity-ticks: 20
-
-      # Можно ли тянуть игроков и мобов при попадании в сущность
       pull-players: true
       pull-mobs: true
+
+  voodoo_doll:
+    enabled: true
+    type: VOODOO_DOLL
+
+    # true = в каждом отдельном мире это оружие можно скрафтить только 1 раз
+    once-per-world: true
+
+    item:
+      material: "minecraft:totem_of_undying"
+      name: "§5§lКукла Вуду"
+      lore:
+        - "§7Ударь игрока, чтобы наложить связь."
+        - "§7Пока связь активна, цель получает"
+        - "§7весь урон владельца с бонусом."
+        - "§8Легендарное оружие Battle Royale"
+      unbreakable: true
+
+    recipe:
+      enabled: true
+      shape:
+        - " S "
+        - "LNL"
+        - " R "
+      ingredients:
+        S: "minecraft:string"
+        L: "minecraft:leather"
+        N: "minecraft:gold_nugget"
+        R: "minecraft:redstone"
+
+    ability:
+      # Такой же стартовый кулдаун, как у гарпуна
+      cooldown-ticks: 60
+
+      # Сколько держится связь между владельцем и целью
+      duration-ticks: 120
+
+      # Жертва получает урон владельца + этот процент сверху
+      bonus-damage-percent: 30.0
+
+      # После удара куклой прямой урон по цели не проходит,
+      # вместо этого только накладывается связь
+      cancel-hit-damage: true
+
+      # При выходе в другой мир связь рвётся
+      require-same-world: true
+
+      # Защитные флаги на смерть
+      break-on-owner-death: true
+      break-on-target-death: true
+
+      # Если true, владелец может перевесить связь на новую цель,
+      # ударив её куклой заново после отката
+      allow-retarget: true
+
+      # Какие причины урона зеркалить на жертву
+      mirrored-causes:
+        - "ENTITY_ATTACK"
+        - "PROJECTILE"
+        - "FIRE"
+        - "FIRE_TICK"
+        - "LAVA"
+        - "BLOCK_EXPLOSION"
+        - "ENTITY_EXPLOSION"
+        - "FALL"
+        - "CONTACT"
+        - "DROWNING"
+        - "MAGIC"
+        - "POISON"
+        - "SUFFOCATION"
+        - "THORNS"
+        - "VOID"
+        - "CUSTOM"
