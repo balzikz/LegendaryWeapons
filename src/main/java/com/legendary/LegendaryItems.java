@@ -1,3 +1,4 @@
+
 package com.legendary;
 
 import cn.nukkit.command.PluginCommand;
@@ -8,6 +9,7 @@ import com.legendary.manager.CooldownManager;
 import com.legendary.manager.HarpoonManager;
 import com.legendary.manager.ItemManager;
 import com.legendary.manager.LegendaryCraftManager;
+import com.legendary.manager.VoodooManager;
 
 public class LegendaryItems extends PluginBase {
 
@@ -17,6 +19,7 @@ public class LegendaryItems extends PluginBase {
     private LegendaryCraftManager craftManager;
     private CooldownManager cooldownManager;
     private HarpoonManager harpoonManager;
+    private VoodooManager voodooManager;
 
     @Override
     public void onEnable() {
@@ -30,6 +33,8 @@ public class LegendaryItems extends PluginBase {
 
         this.cooldownManager = new CooldownManager();
         this.harpoonManager = new HarpoonManager(this, cooldownManager);
+        this.voodooManager = new VoodooManager(this, cooldownManager);
+
         this.craftManager = new LegendaryCraftManager(this, itemManager);
         this.craftManager.registerRecipes();
 
@@ -42,7 +47,14 @@ public class LegendaryItems extends PluginBase {
             this.getLogger().warning("Команда /leg не найдена в plugin.yml");
         }
 
-        this.getLogger().info("§aLegendaryItems включён. MVP-оружие: Гарпун.");
+        this.getLogger().info("§aLegendaryItems включён. Оружия: Гарпун, Кукла Вуду.");
+    }
+
+    @Override
+    public void onDisable() {
+        if (voodooManager != null) {
+            voodooManager.shutdown();
+        }
     }
 
     public static LegendaryItems getInstance() {
@@ -63,5 +75,9 @@ public class LegendaryItems extends PluginBase {
 
     public HarpoonManager getHarpoonManager() {
         return harpoonManager;
+    }
+
+    public VoodooManager getVoodooManager() {
+        return voodooManager;
     }
 }
