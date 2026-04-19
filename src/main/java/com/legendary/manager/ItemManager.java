@@ -39,9 +39,7 @@ public class ItemManager {
             boolean enabled = config.getBoolean(path + ".enabled", true);
             boolean oncePerWorld = config.getBoolean(path + ".once-per-world", true);
             String type = config.getString(path + ".type", id).toUpperCase();
-            String defaultMaterial = "HARPOON".equalsIgnoreCase(type)
-                    ? "minecraft:fishing_rod"
-                    : "minecraft:totem_of_undying";
+            String defaultMaterial = defaultMaterial(type);
             String material = config.getString(path + ".item.material", defaultMaterial);
             String displayName = config.getString(path + ".item.name", "§6Легендарное оружие");
             List<String> lore = new ArrayList<>(config.getStringList(path + ".item.lore"));
@@ -108,7 +106,15 @@ public class ItemManager {
                     config.getBoolean(path + ".ability.break-on-owner-death", true),
                     config.getBoolean(path + ".ability.break-on-target-death", true),
                     config.getBoolean(path + ".ability.allow-retarget", true),
-                    mirroredCauses
+                    mirroredCauses,
+                    config.getDouble(path + ".ability.ray-range", 18.0D),
+                    config.getDouble(path + ".ability.ray-step", 0.35D),
+                    config.getDouble(path + ".ability.self-height-blocks", 1.0D),
+                    config.getDouble(path + ".ability.target-height-blocks", 4.0D),
+                    config.getBoolean(path + ".ability.self-speed-effect", true),
+                    config.getInt(path + ".ability.self-speed-amplifier", 1),
+                    config.getBoolean(path + ".ability.target-slowness-effect", true),
+                    config.getInt(path + ".ability.target-slowness-amplifier", 0)
             );
 
             LegendaryWeaponDefinition definition = new LegendaryWeaponDefinition(
@@ -173,11 +179,11 @@ public class ItemManager {
             item = Item.fromString(definition.getMaterial());
         } catch (Exception e) {
             plugin.getLogger().warning("Не удалось создать предмет из material='" + definition.getMaterial() + "' для " + definition.getId());
-            item = definition.isHarpoon() ? Item.get(346) : Item.get(450);
+            item = createFallbackItem(definition);
         }
 
         if (item == null || item.isNull()) {
-            item = definition.isHarpoon() ? Item.get(346) : Item.get(450);
+            item = createFallbackItem(definition);
         }
 
         item.setCount(1);
@@ -214,5 +220,25 @@ public class ItemManager {
             builder.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
         }
         return builder.toString();
+    }
+
+    private String defaultMaterial(String type) {
+        if ("HARPOON".equalsIgnoreCase(type)) {
+            return "minecraft:fishing_rod";
+        }
+        if ("SHRINK_RAY".equalsIgnoreCase(type) || "SHRINK".equalsIgnoreCase(type)) {
+            return "minecraft:blaze_rod";
+        }
+        return "minecraft:totem_of_undying";
+    }
+
+    private Item createFallbackItem(LegendaryWeaponDefinition definition) {
+        if (definition.isHarpoon()) {
+            return Item.get(346);
+        }
+        if (definition.isShrinkRay()) {
+            return Item.get(369);
+        }
+        return Item.get(450);
     }
 }
