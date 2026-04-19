@@ -8,6 +8,7 @@ import com.legendary.LegendaryItems;
 import com.legendary.model.LegendaryWeaponDefinition;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -38,7 +39,10 @@ public class ItemManager {
             boolean enabled = config.getBoolean(path + ".enabled", true);
             boolean oncePerWorld = config.getBoolean(path + ".once-per-world", true);
             String type = config.getString(path + ".type", id).toUpperCase();
-            String material = config.getString(path + ".item.material", "minecraft:fishing_rod");
+            String defaultMaterial = "HARPOON".equalsIgnoreCase(type)
+                    ? "minecraft:fishing_rod"
+                    : "minecraft:totem_of_undying";
+            String material = config.getString(path + ".item.material", defaultMaterial);
             String displayName = config.getString(path + ".item.name", "§6Легендарное оружие");
             List<String> lore = new ArrayList<>(config.getStringList(path + ".item.lore"));
             boolean unbreakable = config.getBoolean(path + ".item.unbreakable", true);
@@ -62,6 +66,28 @@ public class ItemManager {
                     ingredients
             );
 
+            List<String> mirroredCauses = new ArrayList<>(config.getStringList(path + ".ability.mirrored-causes"));
+            if (mirroredCauses.isEmpty() && ("VOODOO_DOLL".equalsIgnoreCase(type) || "VOODOO".equalsIgnoreCase(type))) {
+                mirroredCauses.addAll(Arrays.asList(
+                        "ENTITY_ATTACK",
+                        "PROJECTILE",
+                        "FIRE",
+                        "FIRE_TICK",
+                        "LAVA",
+                        "BLOCK_EXPLOSION",
+                        "ENTITY_EXPLOSION",
+                        "FALL",
+                        "CONTACT",
+                        "DROWNING",
+                        "MAGIC",
+                        "POISON",
+                        "SUFFOCATION",
+                        "THORNS",
+                        "VOID",
+                        "CUSTOM"
+                ));
+            }
+
             LegendaryWeaponDefinition.AbilityDefinition ability = new LegendaryWeaponDefinition.AbilityDefinition(
                     config.getInt(path + ".ability.cooldown-ticks", 60),
                     config.getDouble(path + ".ability.projectile-speed", 1.8),
@@ -74,7 +100,15 @@ public class ItemManager {
                     config.getInt(path + ".ability.stuck-ticks", 14),
                     config.getInt(path + ".ability.fall-immunity-ticks", 20),
                     config.getBoolean(path + ".ability.pull-players", true),
-                    config.getBoolean(path + ".ability.pull-mobs", true)
+                    config.getBoolean(path + ".ability.pull-mobs", true),
+                    config.getInt(path + ".ability.duration-ticks", 120),
+                    config.getDouble(path + ".ability.bonus-damage-percent", 30.0D),
+                    config.getBoolean(path + ".ability.cancel-hit-damage", true),
+                    config.getBoolean(path + ".ability.require-same-world", true),
+                    config.getBoolean(path + ".ability.break-on-owner-death", true),
+                    config.getBoolean(path + ".ability.break-on-target-death", true),
+                    config.getBoolean(path + ".ability.allow-retarget", true),
+                    mirroredCauses
             );
 
             LegendaryWeaponDefinition definition = new LegendaryWeaponDefinition(
@@ -112,12 +146,10 @@ public class ItemManager {
         if (item == null || !item.hasCompoundTag()) {
             return null;
         }
-
         CompoundTag tag = item.getNamedTag();
         if (tag == null || !tag.contains("legendary_id")) {
             return null;
         }
-
         return tag.getString("legendary_id").toLowerCase();
     }
 
@@ -141,11 +173,11 @@ public class ItemManager {
             item = Item.fromString(definition.getMaterial());
         } catch (Exception e) {
             plugin.getLogger().warning("Не удалось создать предмет из material='" + definition.getMaterial() + "' для " + definition.getId());
-            item = Item.get(346); // fishing rod
+            item = definition.isHarpoon() ? Item.get(346) : Item.get(450);
         }
 
         if (item == null || item.isNull()) {
-            item = Item.get(346);
+            item = definition.isHarpoon() ? Item.get(346) : Item.get(450);
         }
 
         item.setCount(1);
@@ -155,6 +187,7 @@ public class ItemManager {
         CompoundTag tag = item.hasCompoundTag() ? item.getNamedTag() : new CompoundTag();
         tag.putBoolean("legendary_weapon", true);
         tag.putString("legendary_id", definition.getId());
+        tag.putString("legendary_type", definition.getType());
         if (definition.isUnbreakable()) {
             tag.putBoolean("Unbreakable", true);
         }
