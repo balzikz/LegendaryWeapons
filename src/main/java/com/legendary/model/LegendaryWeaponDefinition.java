@@ -89,6 +89,10 @@ public class LegendaryWeaponDefinition {
         return "VOODOO_DOLL".equalsIgnoreCase(type) || "VOODOO".equalsIgnoreCase(type);
     }
 
+    public boolean isShrinkRay() {
+        return "SHRINK_RAY".equalsIgnoreCase(type) || "SHRINK".equalsIgnoreCase(type);
+    }
+
     public static class RecipeDefinition {
 
         private final boolean enabled;
@@ -141,6 +145,15 @@ public class LegendaryWeaponDefinition {
         private final boolean allowRetarget;
         private final List<String> mirroredCauses;
 
+        private final double rayRange;
+        private final double rayStep;
+        private final double selfHeightBlocks;
+        private final double targetHeightBlocks;
+        private final boolean selfSpeedEffect;
+        private final int selfSpeedAmplifier;
+        private final boolean targetSlownessEffect;
+        private final int targetSlownessAmplifier;
+
         public AbilityDefinition(int cooldownTicks,
                                  double projectileSpeed,
                                  double pullSpeed,
@@ -160,7 +173,15 @@ public class LegendaryWeaponDefinition {
                                  boolean breakOnOwnerDeath,
                                  boolean breakOnTargetDeath,
                                  boolean allowRetarget,
-                                 List<String> mirroredCauses) {
+                                 List<String> mirroredCauses,
+                                 double rayRange,
+                                 double rayStep,
+                                 double selfHeightBlocks,
+                                 double targetHeightBlocks,
+                                 boolean selfSpeedEffect,
+                                 int selfSpeedAmplifier,
+                                 boolean targetSlownessEffect,
+                                 int targetSlownessAmplifier) {
             this.cooldownTicks = cooldownTicks;
             this.projectileSpeed = projectileSpeed;
             this.pullSpeed = pullSpeed;
@@ -183,6 +204,14 @@ public class LegendaryWeaponDefinition {
             this.mirroredCauses = mirroredCauses == null
                     ? Collections.emptyList()
                     : Collections.unmodifiableList(new ArrayList<>(mirroredCauses));
+            this.rayRange = rayRange;
+            this.rayStep = rayStep;
+            this.selfHeightBlocks = selfHeightBlocks;
+            this.targetHeightBlocks = targetHeightBlocks;
+            this.selfSpeedEffect = selfSpeedEffect;
+            this.selfSpeedAmplifier = selfSpeedAmplifier;
+            this.targetSlownessEffect = targetSlownessEffect;
+            this.targetSlownessAmplifier = targetSlownessAmplifier;
         }
 
         public int getCooldownTicks() {
@@ -263,6 +292,38 @@ public class LegendaryWeaponDefinition {
 
         public List<String> getMirroredCauses() {
             return mirroredCauses;
+        }
+
+        public double getRayRange() {
+            return rayRange;
+        }
+
+        public double getRayStep() {
+            return rayStep;
+        }
+
+        public double getSelfHeightBlocks() {
+            return selfHeightBlocks;
+        }
+
+        public double getTargetHeightBlocks() {
+            return targetHeightBlocks;
+        }
+
+        public boolean isSelfSpeedEffect() {
+            return selfSpeedEffect;
+        }
+
+        public int getSelfSpeedAmplifier() {
+            return selfSpeedAmplifier;
+        }
+
+        public boolean isTargetSlownessEffect() {
+            return targetSlownessEffect;
+        }
+
+        public int getTargetSlownessAmplifier() {
+            return targetSlownessAmplifier;
         }
     }
 }
