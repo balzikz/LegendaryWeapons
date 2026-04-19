@@ -45,6 +45,12 @@ public class LegendaryListener implements Listener {
         if (definition.isHarpoon()) {
             event.setCancelled();
             plugin.getHarpoonManager().useHarpoon(event.getPlayer(), definition);
+            return;
+        }
+
+        if (definition.isShrinkRay()) {
+            event.setCancelled();
+            plugin.getShrinkRayManager().handleUse(event.getPlayer(), definition);
         }
     }
 
@@ -104,12 +110,14 @@ public class LegendaryListener implements Listener {
 
         plugin.getHarpoonManager().cleanupPlayer(event.getPlayer());
         plugin.getVoodooManager().cleanupPlayer(event.getPlayer());
+        plugin.getShrinkRayManager().cleanupPlayer(event.getPlayer());
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         plugin.getHarpoonManager().cleanupPlayer(event.getPlayer());
         plugin.getVoodooManager().handleQuit(event);
+        plugin.getShrinkRayManager().cleanupPlayer(event.getPlayer());
         plugin.getCooldownManager().clear(event.getPlayer());
     }
 
@@ -117,6 +125,7 @@ public class LegendaryListener implements Listener {
     public void onDeath(PlayerDeathEvent event) {
         plugin.getHarpoonManager().cleanupPlayer(event.getEntity());
         plugin.getVoodooManager().handleDeath(event);
+        plugin.getShrinkRayManager().cleanupPlayer(event.getEntity());
         plugin.getCooldownManager().clear(event.getEntity());
     }
 }
