@@ -8,6 +8,7 @@ import cn.nukkit.item.Item;
 import com.legendary.LegendaryItems;
 import com.legendary.model.LegendaryWeaponDefinition;
 
+import java.util.Locale;
 import java.util.Map;
 
 public class LegCommand implements CommandExecutor {
@@ -42,25 +43,27 @@ public class LegCommand implements CommandExecutor {
     private void sendOverview(CommandSender sender) {
         sender.sendMessage("§6§lЛегендарные оружия");
         sender.sendMessage("§7/leg §8- §fсписок оружий");
-        sender.sendMessage("§7/leg <id> §8- §fподробности и крафт");
+        sender.sendMessage("§7/leg <id> §8- §fподробности, эффекты и крафт");
         sender.sendMessage("§7/leg give <id> [игрок] §8- §fвыдать предмет для теста");
         sender.sendMessage(" ");
 
         Player player = sender instanceof Player ? (Player) sender : null;
-
         for (Map.Entry<String, LegendaryWeaponDefinition> entry : plugin.getItemManager().getDefinitions().entrySet()) {
             LegendaryWeaponDefinition definition = entry.getValue();
-            if (!definition.isEnabled()) {
+            if (definition == null || !definition.isEnabled()) {
                 continue;
             }
 
-            String status = "§7(консоль)";
+            String state = "§7(консоль)";
             if (player != null) {
                 boolean canCraft = plugin.getCraftManager().canCraftInWorld(player.getLevel().getName(), definition.getId());
-                status = canCraft ? "§aдоступен" : "§cуже скрафчен";
+                state = canCraft ? "§aдоступен" : "§cуже скрафчен";
             }
 
-            sender.sendMessage("§e- §f" + definition.getDisplayName() + " §8[§7id: §e" + definition.getId() + "§8] §7- " + status);
+            sender.sendMessage("§e- §r" + definition.getDisplayName()
+                    + " §8[§7id: §e" + definition.getId() + "§8]"
+                    + " §7тип: §e" + readableType(definition)
+                    + " §7- " + state);
         }
     }
 
@@ -71,17 +74,32 @@ public class LegCommand implements CommandExecutor {
             return;
         }
 
+        LegendaryWeaponDefinition.AbilityDefinition ability = definition.getAbility();
+
         sender.sendMessage("§6§l" + definition.getDisplayName());
         sender.sendMessage("§7ID: §e" + definition.getId());
-        sender.sendMessage("§7Тип: §e" + definition.getType());
+        sender.sendMessage("§7Тип: §e" + readableType(definition));
         sender.sendMessage("§7База предмета: §e" + plugin.getItemManager().prettifyMaterial(definition.getMaterial()));
-        sender.sendMessage("§7Кулдаун: §e" + definition.getAbility().getCooldownTicks() + " тиков");
+        sender.sendMessage("§7Кулдаун: §e" + (ability != null ? ability.getCooldownTicks() : 0) + " тиков");
         sender.sendMessage("§7Один раз на мир: " + (definition.isOncePerWorld() ? "§aда" : "§cнет"));
 
         if (sender instanceof Player) {
             Player player = (Player) sender;
             boolean canCraft = plugin.getCraftManager().canCraftInWorld(player.getLevel().getName(), definition.getId());
-            sender.sendMessage("§7Статус в мире §e" + player.getLevel().getName() + "§7: " + (canCraft ? "§aещё не скрафчен" : "§cуже скрафчен"));
+            sender.sendMessage("§7Статус в мире §e" + player.getLevel().getName() + "§7: "
+                    + (canCraft ? "§aещё не скрафчен" : "§cуже скрафчен"));
+        }
+
+        if (definition.isHarpoon() && ability != null) {
+            sender.sendMessage("§7Эффект: §fПритягивает тебя к точке попадания или тянет цель к тебе.");
+            sender.sendMessage("§7Сила притягивания: §e" + formatDouble(ability.getPullSpeed()));
+            sender.sendMessage("§7Макс. время подтягивания: §e" + ability.getMaxPullTicks() + " тиков");
+        } else if (definition.isVoodooDoll() && ability != null) {
+            sender.sendMessage("§7Эффект: §fПосле удара связывает цель с владельцем.");
+            sender.sendMessage("§7Длительность связи: §e" + ability.getDurationTicks() + " тиков §8("
+                    + formatDouble(ability.getDurationTicks() / 20.0D) + " сек)");
+            sender.sendMessage("§7Бонус зеркального урона: §e+" + formatDouble(ability.getBonusDamagePercent()) + "%");
+            sender.sendMessage("§7Прямой урон ударом: " + (ability.isCancelHitDamage() ? "§cотменяется" : "§aнаносится"));
         }
 
         sender.sendMessage("§7Описание:");
@@ -92,13 +110,15 @@ public class LegCommand implements CommandExecutor {
         sender.sendMessage("§7Крафт:");
         if (definition.getRecipe() == null || !definition.getRecipe().isEnabled()) {
             sender.sendMessage("§cКрафт отключён.");
-        } else {
-            for (String row : definition.getRecipe().getShape()) {
-                sender.sendMessage("§8  §f" + row);
-            }
-            for (Map.Entry<Character, String> entry : definition.getRecipe().getIngredients().entrySet()) {
-                sender.sendMessage("§8  §e" + entry.getKey() + " §7= §f" + plugin.getItemManager().prettifyMaterial(entry.getValue()));
-            }
+            return;
+        }
+
+        for (String row : definition.getRecipe().getShape()) {
+            sender.sendMessage("§8 §f" + row);
+        }
+        for (Map.Entry<Character, String> entry : definition.getRecipe().getIngredients().entrySet()) {
+            sender.sendMessage("§8 §e" + entry.getKey() + " §7= §f"
+                    + plugin.getItemManager().prettifyMaterial(entry.getValue()));
         }
     }
 
@@ -145,5 +165,22 @@ public class LegCommand implements CommandExecutor {
         if (target != sender) {
             sender.sendMessage("§aВыдал §r" + definition.getDisplayName() + "§a игроку §e" + target.getName());
         }
+    }
+
+    private String readableType(LegendaryWeaponDefinition definition) {
+        if (definition.isHarpoon()) {
+            return "Гарпун";
+        }
+        if (definition.isVoodooDoll()) {
+            return "Кукла Вуду";
+        }
+        return definition.getType().toLowerCase(Locale.ROOT);
+    }
+
+    private String formatDouble(double value) {
+        if (Math.abs(value - Math.rint(value)) < 0.0001D) {
+            return String.valueOf((long) Math.rint(value));
+        }
+        return String.format(Locale.US, "%.2f", value);
     }
 }
