@@ -1,5 +1,6 @@
 package com.legendary.model;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -18,25 +19,23 @@ public class LegendaryWeaponDefinition {
     private final RecipeDefinition recipe;
     private final AbilityDefinition ability;
 
-    public LegendaryWeaponDefinition(
-            String id,
-            boolean enabled,
-            boolean oncePerWorld,
-            String type,
-            String material,
-            String displayName,
-            List<String> lore,
-            boolean unbreakable,
-            RecipeDefinition recipe,
-            AbilityDefinition ability
-    ) {
+    public LegendaryWeaponDefinition(String id,
+                                     boolean enabled,
+                                     boolean oncePerWorld,
+                                     String type,
+                                     String material,
+                                     String displayName,
+                                     List<String> lore,
+                                     boolean unbreakable,
+                                     RecipeDefinition recipe,
+                                     AbilityDefinition ability) {
         this.id = id;
         this.enabled = enabled;
         this.oncePerWorld = oncePerWorld;
-        this.type = type;
+        this.type = type == null ? "UNKNOWN" : type.toUpperCase();
         this.material = material;
         this.displayName = displayName;
-        this.lore = lore == null ? Collections.emptyList() : Collections.unmodifiableList(lore);
+        this.lore = lore == null ? Collections.emptyList() : Collections.unmodifiableList(new ArrayList<>(lore));
         this.unbreakable = unbreakable;
         this.recipe = recipe;
         this.ability = ability;
@@ -83,17 +82,22 @@ public class LegendaryWeaponDefinition {
     }
 
     public boolean isHarpoon() {
-        return "HARPOON".equalsIgnoreCase(type) || "GRAPPLING_HOOK".equalsIgnoreCase(type);
+        return "HARPOON".equalsIgnoreCase(type);
+    }
+
+    public boolean isVoodooDoll() {
+        return "VOODOO_DOLL".equalsIgnoreCase(type) || "VOODOO".equalsIgnoreCase(type);
     }
 
     public static class RecipeDefinition {
+
         private final boolean enabled;
         private final List<String> shape;
         private final Map<Character, String> ingredients;
 
         public RecipeDefinition(boolean enabled, List<String> shape, Map<Character, String> ingredients) {
             this.enabled = enabled;
-            this.shape = shape == null ? Collections.emptyList() : Collections.unmodifiableList(shape);
+            this.shape = shape == null ? Collections.emptyList() : Collections.unmodifiableList(new ArrayList<>(shape));
             this.ingredients = ingredients == null
                     ? Collections.emptyMap()
                     : Collections.unmodifiableMap(new LinkedHashMap<>(ingredients));
@@ -113,7 +117,9 @@ public class LegendaryWeaponDefinition {
     }
 
     public static class AbilityDefinition {
+
         private final int cooldownTicks;
+
         private final double projectileSpeed;
         private final double pullSpeed;
         private final int maxFlightTicks;
@@ -126,20 +132,35 @@ public class LegendaryWeaponDefinition {
         private final boolean pullPlayers;
         private final boolean pullMobs;
 
-        public AbilityDefinition(
-                int cooldownTicks,
-                double projectileSpeed,
-                double pullSpeed,
-                int maxFlightTicks,
-                int maxPullTicks,
-                double minDistance,
-                double verticalCap,
-                double stepBoost,
-                int stuckTicks,
-                int fallImmunityTicks,
-                boolean pullPlayers,
-                boolean pullMobs
-        ) {
+        private final int durationTicks;
+        private final double bonusDamagePercent;
+        private final boolean cancelHitDamage;
+        private final boolean requireSameWorld;
+        private final boolean breakOnOwnerDeath;
+        private final boolean breakOnTargetDeath;
+        private final boolean allowRetarget;
+        private final List<String> mirroredCauses;
+
+        public AbilityDefinition(int cooldownTicks,
+                                 double projectileSpeed,
+                                 double pullSpeed,
+                                 int maxFlightTicks,
+                                 int maxPullTicks,
+                                 double minDistance,
+                                 double verticalCap,
+                                 double stepBoost,
+                                 int stuckTicks,
+                                 int fallImmunityTicks,
+                                 boolean pullPlayers,
+                                 boolean pullMobs,
+                                 int durationTicks,
+                                 double bonusDamagePercent,
+                                 boolean cancelHitDamage,
+                                 boolean requireSameWorld,
+                                 boolean breakOnOwnerDeath,
+                                 boolean breakOnTargetDeath,
+                                 boolean allowRetarget,
+                                 List<String> mirroredCauses) {
             this.cooldownTicks = cooldownTicks;
             this.projectileSpeed = projectileSpeed;
             this.pullSpeed = pullSpeed;
@@ -152,6 +173,16 @@ public class LegendaryWeaponDefinition {
             this.fallImmunityTicks = fallImmunityTicks;
             this.pullPlayers = pullPlayers;
             this.pullMobs = pullMobs;
+            this.durationTicks = durationTicks;
+            this.bonusDamagePercent = bonusDamagePercent;
+            this.cancelHitDamage = cancelHitDamage;
+            this.requireSameWorld = requireSameWorld;
+            this.breakOnOwnerDeath = breakOnOwnerDeath;
+            this.breakOnTargetDeath = breakOnTargetDeath;
+            this.allowRetarget = allowRetarget;
+            this.mirroredCauses = mirroredCauses == null
+                    ? Collections.emptyList()
+                    : Collections.unmodifiableList(new ArrayList<>(mirroredCauses));
         }
 
         public int getCooldownTicks() {
@@ -200,6 +231,38 @@ public class LegendaryWeaponDefinition {
 
         public boolean isPullMobs() {
             return pullMobs;
+        }
+
+        public int getDurationTicks() {
+            return durationTicks;
+        }
+
+        public double getBonusDamagePercent() {
+            return bonusDamagePercent;
+        }
+
+        public boolean isCancelHitDamage() {
+            return cancelHitDamage;
+        }
+
+        public boolean isRequireSameWorld() {
+            return requireSameWorld;
+        }
+
+        public boolean isBreakOnOwnerDeath() {
+            return breakOnOwnerDeath;
+        }
+
+        public boolean isBreakOnTargetDeath() {
+            return breakOnTargetDeath;
+        }
+
+        public boolean isAllowRetarget() {
+            return allowRetarget;
+        }
+
+        public List<String> getMirroredCauses() {
+            return mirroredCauses;
         }
     }
 }
