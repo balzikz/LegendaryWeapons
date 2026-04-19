@@ -1,4 +1,3 @@
-
 package com.legendary;
 
 import cn.nukkit.command.PluginCommand;
@@ -9,9 +8,10 @@ import com.legendary.manager.CooldownManager;
 import com.legendary.manager.HarpoonManager;
 import com.legendary.manager.ItemManager;
 import com.legendary.manager.LegendaryCraftManager;
+import com.legendary.manager.ShrinkRayManager;
 import com.legendary.manager.VoodooManager;
 
-public class LegendaryItems extends PluginBase {
+public 1 LegendaryItems extends PluginBase {
 
     private static LegendaryItems instance;
 
@@ -20,6 +20,7 @@ public class LegendaryItems extends PluginBase {
     private CooldownManager cooldownManager;
     private HarpoonManager harpoonManager;
     private VoodooManager voodooManager;
+    private ShrinkRayManager shrinkRayManager;
 
     @Override
     public void onEnable() {
@@ -34,6 +35,7 @@ public class LegendaryItems extends PluginBase {
         this.cooldownManager = new CooldownManager();
         this.harpoonManager = new HarpoonManager(this, cooldownManager);
         this.voodooManager = new VoodooManager(this, cooldownManager);
+        this.shrinkRayManager = new ShrinkRayManager(this, cooldownManager);
 
         this.craftManager = new LegendaryCraftManager(this, itemManager);
         this.craftManager.registerRecipes();
@@ -47,13 +49,16 @@ public class LegendaryItems extends PluginBase {
             this.getLogger().warning("Команда /leg не найдена в plugin.yml");
         }
 
-        this.getLogger().info("§aLegendaryItems включён. Оружия: Гарпун, Кукла Вуду.");
+        this.getLogger().info("§aLegendaryItems включён. Оружия: Гарпун, Кукла Вуду, Shrink Ray.");
     }
 
     @Override
     public void onDisable() {
         if (voodooManager != null) {
             voodooManager.shutdown();
+        }
+        if (shrinkRayManager != null) {
+            shrinkRayManager.shutdown();
         }
     }
 
@@ -79,5 +84,9 @@ public class LegendaryItems extends PluginBase {
 
     public VoodooManager getVoodooManager() {
         return voodooManager;
+    }
+
+    public ShrinkRayManager getShrinkRayManager() {
+        return shrinkRayManager;
     }
 }
