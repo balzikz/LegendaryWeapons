@@ -1,9 +1,9 @@
 name: LegendaryItems
 main: com.legendary.LegendaryItems
-version: 1.0.0
+version: 1.1.0
 api: ["1.0.5"]
-author: Balzikz & OpenAI
-website: https://github.com/balzikz/Legendary-Weapons_Nukkit-MOT
+author: Balzikz
+website: https://github.com/balzikz/LegendaryWeapons
 description: Legendary weapons plugin for Battle Royale in NukkitMOT
 
 commands:
