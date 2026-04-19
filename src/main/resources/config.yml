@@ -120,3 +120,54 @@ weapons:
         - "THORNS"
         - "VOID"
         - "CUSTOM"
+
+  shrink_ray:
+    enabled: true
+    type: SHRINK_RAY
+
+    # true = в каждом отдельном мире это оружие можно скрафтить только 1 раз
+    once-per-world: true
+
+    item:
+      material: "minecraft:blaze_rod"
+      name: "§b§lShrink Ray"
+      lore:
+        - "§7Shift + ПКМ — уменьшает тебя."
+        - "§7ПКМ — стреляет лучом, увеличивающим врага."
+        - "§7Одновременно активна только одна способность."
+        - "§8Легендарное оружие Battle Royale"
+      unbreakable: true
+
+    recipe:
+      enabled: true
+      shape:
+        - "GGG"
+        - "RBR"
+        - " D "
+      ingredients:
+        G: "minecraft:glass_pane"
+        R: "minecraft:redstone"
+        B: "minecraft:blaze_rod"
+        D: "minecraft:diamond"
+
+    ability:
+      # Такой же стартовый кулдаун, как у остальных легендарок
+      cooldown-ticks: 60
+
+      # Сколько секунд держится уменьшение / увеличение
+      duration-ticks: 120
+
+      # Дальность луча и шаг проверки попадания
+      ray-range: 18.0
+      ray-step: 0.35
+
+      # Желаемая высота в блоках, не scale.
+      # Внутри плагин сам переведёт это в scale.
+      self-height-blocks: 1.0
+      target-height-blocks: 4.0
+
+      # Баффы к движению
+      self-speed-effect: true
+      self-speed-amplifier: 1
+      target-slowness-effect: true
+      target-slowness-amplifier: 0
