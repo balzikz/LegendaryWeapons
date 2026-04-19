@@ -4,11 +4,14 @@ import cn.nukkit.Player;
 import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.Listener;
 import cn.nukkit.event.entity.EntityDamageByChildEntityEvent;
+import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.ProjectileHitEvent;
 import cn.nukkit.event.inventory.CraftItemEvent;
+import cn.nukkit.event.player.PlayerDeathEvent;
 import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.event.player.PlayerQuitEvent;
+import cn.nukkit.event.player.PlayerTeleportEvent;
 import cn.nukkit.item.Item;
 import com.legendary.LegendaryItems;
 import com.legendary.model.LegendaryWeaponDefinition;
@@ -56,6 +59,11 @@ public class LegendaryListener implements Listener {
     }
 
     @EventHandler
+    public void onMelee(EntityDamageByEntityEvent event) {
+        plugin.getVoodooManager().handleMarkHit(event);
+    }
+
+    @EventHandler
     public void onCraft(CraftItemEvent event) {
         if (event.getRecipe() == null || event.getRecipe().getResult() == null) {
             return;
@@ -73,24 +81,42 @@ public class LegendaryListener implements Listener {
 
     @EventHandler
     public void onDamage(EntityDamageEvent event) {
-        if (!(event.getEntity() instanceof Player)) {
+        if (event.getEntity() instanceof Player
+                && event.getCause() == EntityDamageEvent.DamageCause.FALL) {
+            Player player = (Player) event.getEntity();
+            if (plugin.getHarpoonManager().hasFallImmunity(player)) {
+                event.setCancelled();
+                plugin.getHarpoonManager().consumeFallImmunity(player);
+            }
+        }
+
+        plugin.getVoodooManager().handleOwnerDamage(event);
+    }
+
+    @EventHandler
+    public void onTeleport(PlayerTeleportEvent event) {
+        if (event.getFrom() == null || event.getTo() == null) {
+            return;
+        }
+        if (event.getFrom().getLevel() == event.getTo().getLevel()) {
             return;
         }
 
-        if (event.getCause() != EntityDamageEvent.DamageCause.FALL) {
-            return;
-        }
-
-        Player player = (Player) event.getEntity();
-        if (plugin.getHarpoonManager().hasFallImmunity(player)) {
-            event.setCancelled();
-            plugin.getHarpoonManager().consumeFallImmunity(player);
-        }
+        plugin.getHarpoonManager().cleanupPlayer(event.getPlayer());
+        plugin.getVoodooManager().cleanupPlayer(event.getPlayer());
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         plugin.getHarpoonManager().cleanupPlayer(event.getPlayer());
+        plugin.getVoodooManager().handleQuit(event);
         plugin.getCooldownManager().clear(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onDeath(PlayerDeathEvent event) {
+        plugin.getHarpoonManager().cleanupPlayer(event.getEntity());
+        plugin.getVoodooManager().handleDeath(event);
+        plugin.getCooldownManager().clear(event.getEntity());
     }
 }
