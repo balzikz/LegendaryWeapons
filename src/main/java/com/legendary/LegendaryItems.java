@@ -2,9 +2,10 @@ package com.legendary;
 
 import cn.nukkit.command.PluginCommand;
 import cn.nukkit.plugin.PluginBase;
-import com.legendary.commands.LegCommand;
-import com.legendary.listeners.LegendaryListener;
+import com.legendary.command.LegCommand;
+import com.legendary.listener.LegendaryListener;
 import com.legendary.manager.CooldownManager;
+import com.legendary.manager.DeathNoteManager;
 import com.legendary.manager.HarpoonManager;
 import com.legendary.manager.ItemManager;
 import com.legendary.manager.LegendaryCraftManager;
@@ -21,6 +22,7 @@ public class LegendaryItems extends PluginBase {
     private HarpoonManager harpoonManager;
     private VoodooManager voodooManager;
     private ShrinkRayManager shrinkRayManager;
+    private DeathNoteManager deathNoteManager;
 
     @Override
     public void onEnable() {
@@ -36,6 +38,7 @@ public class LegendaryItems extends PluginBase {
         this.harpoonManager = new HarpoonManager(this, cooldownManager);
         this.voodooManager = new VoodooManager(this, cooldownManager);
         this.shrinkRayManager = new ShrinkRayManager(this, cooldownManager);
+        this.deathNoteManager = new DeathNoteManager(this, cooldownManager);
 
         this.craftManager = new LegendaryCraftManager(this, itemManager);
         this.craftManager.registerRecipes();
@@ -49,7 +52,7 @@ public class LegendaryItems extends PluginBase {
             this.getLogger().warning("Команда /leg не найдена в plugin.yml");
         }
 
-        this.getLogger().info("§aLegendaryItems включён. Оружия: Гарпун, Кукла Вуду, Shrink Ray.");
+        this.getLogger().info("§aLegendaryItems включён. Оружия: Гарпун, Кукла Вуду, Shrink Ray, Тетрадь смерти.");
     }
 
     @Override
@@ -59,6 +62,9 @@ public class LegendaryItems extends PluginBase {
         }
         if (shrinkRayManager != null) {
             shrinkRayManager.shutdown();
+        }
+        if (deathNoteManager != null) {
+            deathNoteManager.shutdown();
         }
     }
 
@@ -88,5 +94,9 @@ public class LegendaryItems extends PluginBase {
 
     public ShrinkRayManager getShrinkRayManager() {
         return shrinkRayManager;
+    }
+
+    public DeathNoteManager getDeathNoteManager() {
+        return deathNoteManager;
     }
 }
