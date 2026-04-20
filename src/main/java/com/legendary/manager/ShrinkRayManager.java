@@ -1,590 +1,550 @@
 package com.legendary.manager;
 
 import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.block.Block;
+import cn.nukkit.entity.Entity;
+import cn.nukkit.item.Item;
+import cn.nukkit.level.Location;
+import cn.nukkit.level.Position;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.Vector3;
+import cn.nukkit.plugin.PluginBase;
 import cn.nukkit.potion.Effect;
-import cn.nukkit.scheduler.NukkitRunnable;
-import com.legendary.LegendaryItems;
-import com.legendary.model.LegendaryWeaponDefinition;
+import cn.nukkit.scheduler.Task;
 
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class ShrinkRayManager {
 
-    private static final double VANILLA_PLAYER_HEIGHT = 1.8D;
-    private static final double MIN_SCALE = 0.35D;
-    private static final double MAX_SCALE = 2.4D;
-
-    private static final String TAG_ACTIVE = "legendary_shrink_ray_active";
-    private static final String TAG_SMALL = "legendary_shrink_ray_small";
-    private static final String TAG_BIG = "legendary_shrink_ray_big";
-
-    private final LegendaryItems plugin;
+    private final PluginBase plugin;
     private final CooldownManager cooldownManager;
-    private final Map<UUID, ActiveScale> activeByTarget = new ConcurrentHashMap<>();
-    private final Map<UUID, UUID> activeTargetByCaster = new ConcurrentHashMap<>();
-    private NukkitRunnable cleanupTask;
+    private final ItemManager itemManager;
 
-    public ShrinkRayManager(LegendaryItems plugin, CooldownManager cooldownManager) {
+    private final Map<UUID, ScaleState> scaledPlayers = new HashMap<>();
+    private final Set<UUID> activePlayers = new HashSet<>();
+    private final Set<UUID> shrunkPlayers = new HashSet<>();
+    private final Set<UUID> giantPlayers = new HashSet<>();
+
+    private int cooldownTicks;
+    private int selfDurationTicks;
+    private int targetDurationTicks;
+    private double selfScale;
+    private double targetScale;
+    private int selfSpeedAmplifier;
+    private int targetSlownessAmplifier;
+    private double rayRange;
+    private boolean revertOnWorldChange;
+    private boolean revertOnQuit;
+    private boolean revertOnDeath;
+
+    public ShrinkRayManager(PluginBase plugin, CooldownManager cooldownManager, ItemManager itemManager) {
         this.plugin = plugin;
         this.cooldownManager = cooldownManager;
-        startCleanupTask();
+        this.itemManager = itemManager;
+        loadConfig();
+        startTickTask();
     }
 
-    public void handleUse(Player player, LegendaryWeaponDefinition definition) {
-        if (player == null || definition == null || !definition.isShrinkRay() || definition.getAbility() == null) {
-            return;
+    public void reload() {
+        loadConfig();
+    }
+
+    private void loadConfig() {
+        this.cooldownTicks = plugin.getConfig().getInt("weapons.shrink_ray.cooldown-ticks", 60);
+        this.selfDurationTicks = plugin.getConfig().getInt("weapons.shrink_ray.self-duration-ticks", 100);
+        this.targetDurationTicks = plugin.getConfig().getInt("weapons.shrink_ray.target-duration-ticks", 100);
+        this.selfScale = plugin.getConfig().getDouble("weapons.shrink_ray.self-scale", 0.55D);
+        this.targetScale = plugin.getConfig().getDouble("weapons.shrink_ray.target-scale", 2.2D);
+        this.selfSpeedAmplifier = plugin.getConfig().getInt("weapons.shrink_ray.self-speed-amplifier", 1);
+        this.targetSlownessAmplifier = plugin.getConfig().getInt("weapons.shrink_ray.target-slowness-amplifier", 1);
+        this.rayRange = plugin.getConfig().getDouble("weapons.shrink_ray.ray-range", 18.0D);
+        this.revertOnWorldChange = plugin.getConfig().getBoolean("weapons.shrink_ray.revert-on-world-change", true);
+        this.revertOnQuit = plugin.getConfig().getBoolean("weapons.shrink_ray.revert-on-quit", true);
+        this.revertOnDeath = plugin.getConfig().getBoolean("weapons.shrink_ray.revert-on-death", true);
+
+        if (selfScale <= 0.1D) selfScale = 0.1D;
+        if (targetScale < 1.0D) targetScale = 1.0D;
+        if (rayRange < 3.0D) rayRange = 3.0D;
+    }
+
+    public boolean handleUse(Player player, Item item) {
+        if (!itemManager.isLegendary(item, "shrink_ray")) {
+            return false;
         }
 
-        LegendaryWeaponDefinition.AbilityDefinition ability = definition.getAbility();
-
-        if (cooldownManager.isOnCooldown(player, definition.getId())) {
-            player.sendActionBar("§cShrink Ray перезаряжается: "
-                    + cooldownManager.getRemainingTicks(player, definition.getId()) + " тиков");
-            return;
+        if (cooldownManager.isOnCooldown(player, "shrink_ray")) {
+            int left = cooldownManager.getRemaining(player, "shrink_ray");
+            player.sendMessage("§cShrink Ray перезаряжается еще " + left + " тиков.");
+            return true;
         }
 
-        if (activeTargetByCaster.containsKey(player.getUniqueId())) {
-            player.sendMessage("§cОдновременно можно держать активной только одну способность Shrink Ray.");
-            return;
-        }
-
-        if (activeByTarget.containsKey(player.getUniqueId())) {
-            player.sendMessage("§cПока на тебе уже висит изменение размера, Shrink Ray использовать нельзя.");
-            return;
+        if (isScaled(player)) {
+            player.sendMessage("§cПока эффект Shrink Ray активен, вторую способность использовать нельзя.");
+            return true;
         }
 
         if (player.isSneaking()) {
-            useSelfShrink(player, definition, ability);
+            activateSelfShrink(player);
+            return true;
+        }
+
+        Player target = findTargetPlayer(player, rayRange);
+        if (target == null) {
+            player.sendMessage("§cЦель не найдена.");
+            return true;
+        }
+
+        if (isScaled(target)) {
+            player.sendMessage("§cНа цели уже активен эффект изменения размера.");
+            return true;
+        }
+
+        if (!canGrowAtLocation(target)) {
+            player.sendMessage("§cЦель нельзя увеличить здесь: недостаточно места.");
+            return true;
+        }
+
+        activateTargetGrow(player, target);
+        return true;
+    }
+
+    private void activateSelfShrink(Player player) {
+        ScaleState state = new ScaleState(
+                player.getUniqueId(),
+                safeGetScale(player),
+                currentTick() + selfDurationTicks,
+                true,
+                selfSpeedAmplifier
+        );
+
+        applyScale(player, selfScale);
+        applySpeed(player, selfSpeedAmplifier);
+        scaledPlayers.put(player.getUniqueId(), state);
+        markShrunk(player);
+        cooldownManager.setCooldown(player, "shrink_ray", cooldownTicks);
+
+        player.sendMessage("§aТы уменьшился.");
+    }
+
+    private void activateTargetGrow(Player owner, Player target) {
+        ScaleState state = new ScaleState(
+                target.getUniqueId(),
+                safeGetScale(target),
+                currentTick() + targetDurationTicks,
+                false,
+                targetSlownessAmplifier
+        );
+
+        applyScale(target, targetScale);
+        applySlowness(target, targetSlownessAmplifier);
+        scaledPlayers.put(target.getUniqueId(), state);
+        markGiant(target);
+        cooldownManager.setCooldown(owner, "shrink_ray", cooldownTicks);
+
+        owner.sendMessage("§aТы увеличил игрока §e" + target.getName() + "§a.");
+        target.sendMessage("§cТебя увеличили с помощью Shrink Ray.");
+    }
+
+    private Player findTargetPlayer(Player player, double range) {
+        Vector3 direction = player.getDirectionVector().normalize();
+        Location eye = player.add(0, player.getEyeHeight(), 0);
+
+        Player best = null;
+        double bestDistance = Double.MAX_VALUE;
+
+        for (Player target : Server.getInstance().getOnlinePlayers().values()) {
+            if (target == null || !target.isOnline() || target == player) {
+                continue;
+            }
+
+            if (target.level != player.level) {
+                continue;
+            }
+
+            double distance = target.distance(player);
+            if (distance > range) {
+                continue;
+            }
+
+            if (!hasLineOfSight(player, target, range)) {
+                continue;
+            }
+
+            Vector3 toTarget = target.add(0, target.getEyeHeight() * 0.5, 0).subtract(eye.x, eye.y, eye.z);
+            double dot = direction.dot(toTarget.normalize());
+
+            if (dot < 0.965D) {
+                continue;
+            }
+
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                best = target;
+            }
+        }
+
+        return best;
+    }
+
+    private boolean hasLineOfSight(Player from, Player to, double range) {
+        Vector3 start = from.add(0, from.getEyeHeight(), 0);
+        Vector3 end = to.add(0, to.getEyeHeight() * 0.5, 0);
+        Vector3 diff = end.subtract(start.x, start.y, start.z);
+
+        double length = diff.length();
+        if (length <= 0.0D) {
+            return false;
+        }
+
+        if (length > range) {
+            return false;
+        }
+
+        Vector3 step = diff.normalize().multiply(0.35D);
+        Vector3 current = start.clone();
+
+        for (double walked = 0; walked < length; walked += 0.35D) {
+            current = current.add(step);
+            Block block = from.level.getBlock(current);
+            if (block != null && block.getId() != 0 && block.isSolid()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private boolean canGrowAtLocation(Player player) {
+        Position pos = player.getPosition();
+        int baseX = pos.getFloorX();
+        int baseY = pos.getFloorY();
+        int baseZ = pos.getFloorZ();
+
+        for (int y = 0; y < 4; y++) {
+            Block block = player.level.getBlock(new Vector3(baseX, baseY + y, baseZ));
+            if (block != null && block.getId() != 0 && block.isSolid()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void startTickTask() {
+        plugin.getServer().getScheduler().scheduleRepeatingTask(plugin, new Task() {
+            @Override
+            public void onRun(int currentTick) {
+                tickStates(currentTick);
+            }
+        }, 5);
+    }
+
+    private void tickStates(int tick) {
+        Iterator<Map.Entry<UUID, ScaleState>> iterator = scaledPlayers.entrySet().iterator();
+
+        while (iterator.hasNext()) {
+            Map.Entry<UUID, ScaleState> entry = iterator.next();
+            UUID uuid = entry.getKey();
+            ScaleState state = entry.getValue();
+
+            Player player = plugin.getServer().getPlayer(uuid);
+            if (player == null || !player.isOnline()) {
+                iterator.remove();
+                activePlayers.remove(uuid);
+                shrunkPlayers.remove(uuid);
+                giantPlayers.remove(uuid);
+                continue;
+            }
+
+            if (tick < state.expireTick) {
+                continue;
+            }
+
+            if (state.shrunk && !canReturnToNormal(player)) {
+                state.expireTick = tick + 10;
+                continue;
+            }
+
+            resetPlayer(player);
+            iterator.remove();
+        }
+    }
+
+    private boolean canReturnToNormal(Player player) {
+        Position pos = player.getPosition();
+        int baseX = pos.getFloorX();
+        int baseY = pos.getFloorY();
+        int baseZ = pos.getFloorZ();
+
+        for (int y = 0; y < 2; y++) {
+            Block block = player.level.getBlock(new Vector3(baseX, baseY + y, baseZ));
+            if (block != null && block.getId() != 0 && block.isSolid()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public void handleQuit(Player player) {
+        if (!revertOnQuit) {
+            scaledPlayers.remove(player.getUniqueId());
+            markNormal(player);
+            return;
+        }
+        forceReset(player);
+    }
+
+    public void handleDeath(Player player) {
+        if (!revertOnDeath) {
+            scaledPlayers.remove(player.getUniqueId());
+            markNormal(player);
+            return;
+        }
+        forceReset(player);
+    }
+
+    public void handleTeleport(Player player, Position from, Position to) {
+        if (!revertOnWorldChange) {
             return;
         }
 
-        fireGrowthRay(player, definition, ability);
+        if (from == null || to == null) {
+            return;
+        }
+
+        if (from.level != to.level) {
+            forceReset(player);
+        }
     }
 
-    public void cleanupPlayer(Player player) {
+    public void handleDisable() {
+        for (Player player : plugin.getServer().getOnlinePlayers().values()) {
+            if (player != null && isScaled(player)) {
+                forceReset(player);
+            }
+        }
+        scaledPlayers.clear();
+        activePlayers.clear();
+        shrunkPlayers.clear();
+        giantPlayers.clear();
+    }
+
+    public boolean isScaled(Player player) {
+        return activePlayers.contains(player.getUniqueId());
+    }
+
+    public boolean isShrunk(Player player) {
+        return shrunkPlayers.contains(player.getUniqueId());
+    }
+
+    public boolean isGiant(Player player) {
+        return giantPlayers.contains(player.getUniqueId());
+    }
+
+    private void markNormal(Player target) {
+        UUID id = target.getUniqueId();
+        activePlayers.remove(id);
+        shrunkPlayers.remove(id);
+        giantPlayers.remove(id);
+    }
+
+    private void markShrunk(Player target) {
+        UUID id = target.getUniqueId();
+        activePlayers.add(id);
+        shrunkPlayers.add(id);
+        giantPlayers.remove(id);
+    }
+
+    private void markGiant(Player target) {
+        UUID id = target.getUniqueId();
+        activePlayers.add(id);
+        shrunkPlayers.remove(id);
+        giantPlayers.add(id);
+    }
+
+    public void forceReset(Player player) {
         if (player == null) {
             return;
         }
 
-        ActiveScale selfState = activeByTarget.get(player.getUniqueId());
-        if (selfState != null) {
-            clearState(selfState, false, false, true);
+        resetPlayer(player);
+        scaledPlayers.remove(player.getUniqueId());
+    }
+
+    private void resetPlayer(Player player) {
+        ScaleState state = scaledPlayers.get(player.getUniqueId());
+        double restoreScale = 1.0D;
+
+        if (state != null) {
+            restoreScale = state.originalScale;
         }
 
-        UUID targetId = activeTargetByCaster.get(player.getUniqueId());
-        if (targetId != null) {
-            ActiveScale castState = activeByTarget.get(targetId);
-            if (castState != null) {
-                clearState(castState, false, false, true);
-            } else {
-                activeTargetByCaster.remove(player.getUniqueId(), targetId);
-            }
+        applyScale(player, restoreScale);
+        clearEffects(player);
+        markNormal(player);
+        player.sendMessage("§eТвой размер восстановлен.");
+    }
+
+    private void clearEffects(Player player) {
+        try {
+            player.removeEffect(Effect.SPEED);
+        } catch (Throwable ignored) {
+        }
+
+        try {
+            player.removeEffect(Effect.SLOWNESS);
+        } catch (Throwable ignored) {
         }
     }
 
-    public void shutdown() {
-        if (cleanupTask != null) {
-            try {
-                cleanupTask.cancel();
-            } catch (Exception ignored) {
-                // ignore
-            }
-        }
+    private void applySpeed(Player player, int amplifier) {
+        clearEffects(player);
 
-        List<ActiveScale> snapshot = new ArrayList<>(activeByTarget.values());
-        for (ActiveScale state : snapshot) {
-            clearState(state, false, false, true);
-        }
-
-        activeByTarget.clear();
-        activeTargetByCaster.clear();
-    }
-
-    private void useSelfShrink(Player player,
-                               LegendaryWeaponDefinition definition,
-                               LegendaryWeaponDefinition.AbilityDefinition ability) {
-        double targetScale = clampScale(scaleFromHeight(ability.getSelfHeightBlocks()));
-        if (targetScale <= 0.0D) {
-            player.sendMessage("§cВ config.yml у Shrink Ray некорректно настроен self-height-blocks.");
+        Effect effect = Effect.getEffect(Effect.SPEED);
+        if (effect == null) {
             return;
         }
 
-        if (!applyScaleState(player, player, definition.getId(), targetScale, ability, ScaleMode.SELF_SMALL)) {
-            player.sendMessage("§cНе удалось активировать уменьшение.");
+        effect.setDuration(Math.max(40, selfDurationTicks + 20));
+        effect.setAmplifier(Math.max(0, amplifier));
+        effect.setVisible(false);
+        player.addEffect(effect);
+    }
+
+    private void applySlowness(Player player, int amplifier) {
+        clearEffects(player);
+
+        Effect effect = Effect.getEffect(Effect.SLOWNESS);
+        if (effect == null) {
             return;
         }
 
-        cooldownManager.setCooldown(player, definition.getId(), ability.getCooldownTicks());
-        player.sendMessage("§b§l[Shrink Ray] §fТы уменьшился до §e"
-                + formatDouble(ability.getSelfHeightBlocks()) + "§f блока в высоту.");
-    }
-
-    private void fireGrowthRay(Player caster,
-                               LegendaryWeaponDefinition definition,
-                               LegendaryWeaponDefinition.AbilityDefinition ability) {
-        Player target = findFirstHitPlayer(caster, ability);
-        cooldownManager.setCooldown(caster, definition.getId(), ability.getCooldownTicks());
-
-        if (target == null) {
-            caster.sendActionBar("§7Shrink Ray: луч не нашёл цель.");
-            return;
-        }
-
-        if (activeByTarget.containsKey(target.getUniqueId())) {
-            caster.sendMessage("§cЭта цель уже находится под действием Shrink Ray.");
-            return;
-        }
-
-        double targetScale = clampScale(scaleFromHeight(ability.getTargetHeightBlocks()));
-        if (!hasClearanceForScale(target, targetScale)) {
-            caster.sendMessage("§cЦель стоит под потолком — увеличить её сейчас нельзя.");
-            return;
-        }
-
-        if (!applyScaleState(caster, target, definition.getId(), targetScale, ability, ScaleMode.TARGET_BIG)) {
-            caster.sendMessage("§cНе удалось применить Shrink Ray к цели.");
-            return;
-        }
-
-        caster.sendMessage("§b§l[Shrink Ray] §fТы увеличил игрока §e" + target.getName()
-                + "§f до §e" + formatDouble(ability.getTargetHeightBlocks()) + "§f блоков в высоту.");
-        target.sendMessage("§b§l[Shrink Ray] §fТвой размер увеличен до §e"
-                + formatDouble(ability.getTargetHeightBlocks()) + "§f блоков на несколько секунд.");
-    }
-
-    private boolean applyScaleState(Player caster,
-                                    Player target,
-                                    String weaponId,
-                                    double newScale,
-                                    LegendaryWeaponDefinition.AbilityDefinition ability,
-                                    ScaleMode mode) {
-        if (caster == null || target == null) {
-            return false;
-        }
-        if (activeTargetByCaster.containsKey(caster.getUniqueId())) {
-            return false;
-        }
-        if (activeByTarget.containsKey(target.getUniqueId())) {
-            return false;
-        }
-
-        Effect previousSpeed = cloneEffect(target, Effect.SPEED);
-        Effect previousSlowness = cloneEffect(target, Effect.SLOWNESS);
-        long now = System.currentTimeMillis();
-
-        ActiveScale state = new ActiveScale(
-                target.getUniqueId(),
-                caster.getUniqueId(),
-                weaponId,
-                target.getLevel().getName(),
-                caster.getLevel().getName(),
-                safeScale(target),
-                newScale,
-                mode,
-                now,
-                now + (ability.getDurationTicks() * 50L),
-                previousSpeed,
-                previousSlowness,
-                ability.isSelfSpeedEffect(),
-                ability.getSelfSpeedAmplifier(),
-                ability.isTargetSlownessEffect(),
-                ability.getTargetSlownessAmplifier()
-        );
-
-        activeByTarget.put(target.getUniqueId(), state);
-        activeTargetByCaster.put(caster.getUniqueId(), target.getUniqueId());
-
-        applyTags(target, mode);
-        applyScale(target, newScale);
-        applyPotionState(target, state, ability.getDurationTicks());
-        return true;
-    }
-
-    private Player findFirstHitPlayer(Player caster, LegendaryWeaponDefinition.AbilityDefinition ability) {
-        Vector3 origin = caster.add(0, caster.getEyeHeight(), 0);
-        Vector3 direction = caster.getDirectionVector();
-
-        double length = Math.sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
-        if (length <= 0.0001D) {
-            return null;
-        }
-
-        double dx = direction.x / length;
-        double dy = direction.y / length;
-        double dz = direction.z / length;
-        double step = Math.max(0.20D, ability.getRayStep());
-        double range = Math.max(2.0D, ability.getRayRange());
-
-        for (double traveled = 0.0D; traveled <= range; traveled += step) {
-            Vector3 point = new Vector3(
-                    origin.x + (dx * traveled),
-                    origin.y + (dy * traveled),
-                    origin.z + (dz * traveled)
-            );
-
-            if (traveled > 0.30D) {
-                Block block = caster.getLevel().getBlock(point);
-                if (block != null && !block.canPassThrough()) {
-                    return null;
-                }
-            }
-
-            Player hit = findPlayerAtPoint(caster, point);
-            if (hit != null) {
-                return hit;
-            }
-        }
-
-        return null;
-    }
-
-    private Player findPlayerAtPoint(Player caster, Vector3 point) {
-        for (Player candidate : plugin.getServer().getOnlinePlayers().values()) {
-            if (candidate == null || candidate == caster) {
-                continue;
-            }
-            if (!candidate.isOnline() || candidate.isClosed() || !candidate.isAlive()) {
-                continue;
-            }
-            if (candidate.getLevel() != caster.getLevel()) {
-                continue;
-            }
-
-            double candidateScale = Math.max(0.50D, safeScale(candidate));
-            double height = Math.max(1.0D, candidateScale * VANILLA_PLAYER_HEIGHT);
-            double radius = Math.max(0.45D, candidateScale * 0.35D);
-
-            if (point.y < candidate.y || point.y > candidate.y + height) {
-                continue;
-            }
-
-            double distX = candidate.x - point.x;
-            double distZ = candidate.z - point.z;
-            if ((distX * distX) + (distZ * distZ) <= radius * radius) {
-                return candidate;
-            }
-        }
-        return null;
-    }
-
-    private void applyPotionState(Player target, ActiveScale state, int durationTicks) {
-        target.removeEffect(Effect.SPEED);
-        target.removeEffect(Effect.SLOWNESS);
-
-        if (state.mode == ScaleMode.SELF_SMALL && state.selfSpeedEffect) {
-            Effect effect = Effect.getEffect(Effect.SPEED);
-            if (effect != null) {
-                effect.setDuration(durationTicks + 5)
-                        .setAmplifier(Math.max(0, state.selfSpeedAmplifier))
-                        .setVisible(false)
-                        .setAmbient(false);
-                target.addEffect(effect);
-            }
-        } else if (state.mode == ScaleMode.TARGET_BIG && state.targetSlownessEffect) {
-            Effect effect = Effect.getEffect(Effect.SLOWNESS);
-            if (effect != null) {
-                effect.setDuration(durationTicks + 5)
-                        .setAmplifier(Math.max(0, state.targetSlownessAmplifier))
-                        .setVisible(false)
-                        .setAmbient(false);
-                target.addEffect(effect);
-            }
-        }
-    }
-
-    private void startCleanupTask() {
-        cleanupTask = new NukkitRunnable() {
-            @Override
-            public void run() {
-                sweepStates();
-            }
-        };
-        cleanupTask.runTaskTimer(plugin, 10, 10);
-    }
-
-    private void sweepStates() {
-        if (activeByTarget.isEmpty()) {
-            return;
-        }
-
-        long now = System.currentTimeMillis();
-        List<ActiveScale> snapshot = new ArrayList<>(activeByTarget.values());
-        for (ActiveScale state : snapshot) {
-            Player target = getOnlinePlayer(state.targetId);
-            Player caster = getOnlinePlayer(state.casterId);
-
-            if (target == null || !target.isOnline() || target.isClosed()) {
-                clearState(state, false, false, true);
-                continue;
-            }
-            if (caster == null || !caster.isOnline() || caster.isClosed()) {
-                clearState(state, false, false, true);
-                continue;
-            }
-            if (!target.isAlive() || !caster.isAlive()) {
-                clearState(state, false, false, true);
-                continue;
-            }
-            if (!state.targetWorld.equalsIgnoreCase(target.getLevel().getName())) {
-                clearState(state, false, false, true);
-                continue;
-            }
-            if (!state.casterWorld.equalsIgnoreCase(caster.getLevel().getName())) {
-                clearState(state, false, false, true);
-                continue;
-            }
-            if (target.getLevel() != caster.getLevel()) {
-                clearState(state, false, false, true);
-                continue;
-            }
-            if (now >= state.expiresAtMillis) {
-                clearState(state, true, true, false);
-            }
-        }
-    }
-
-    private void clearState(ActiveScale state,
-                            boolean notifyCaster,
-                            boolean notifyTarget,
-                            boolean forceRestore) {
-        if (state == null) {
-            return;
-        }
-
-        Player target = getOnlinePlayer(state.targetId);
-        Player caster = getOnlinePlayer(state.casterId);
-        long now = System.currentTimeMillis();
-
-        if (!forceRestore && target != null && target.isOnline() && !target.isClosed()) {
-            if (!hasClearanceForScale(target, state.previousScale)) {
-                state.expiresAtMillis = now + 500L;
-                if (now - state.lastNoSpaceNoticeMillis >= 1000L) {
-                    target.sendActionBar("§eShrink Ray ждёт, пока сверху появится место...");
-                    state.lastNoSpaceNoticeMillis = now;
-                }
-                return;
-            }
-        }
-
-        activeByTarget.remove(state.targetId, state);
-        activeTargetByCaster.remove(state.casterId, state.targetId);
-
-        if (target != null && target.isOnline() && !target.isClosed()) {
-            restoreTarget(target, state, now);
-        }
-
-        if (notifyCaster && caster != null && caster.isOnline()) {
-            if (state.mode == ScaleMode.SELF_SMALL) {
-                caster.sendMessage("§b§l[Shrink Ray] §7Ты снова обычного размера.");
-            } else {
-                caster.sendMessage("§b§l[Shrink Ray] §7Эффект увеличения цели закончился.");
-            }
-        }
-
-        if (notifyTarget && target != null && target.isOnline()) {
-            if (state.mode == ScaleMode.TARGET_BIG) {
-                target.sendMessage("§b§l[Shrink Ray] §7Твой размер вернулся к обычному.");
-            }
-        }
-    }
-
-    private void restoreTarget(Player target, ActiveScale state, long now) {
-        target.removeTag(TAG_ACTIVE);
-        target.removeTag(TAG_SMALL);
-        target.removeTag(TAG_BIG);
-
-        applyScale(target, state.previousScale);
-        target.removeEffect(Effect.SPEED);
-        target.removeEffect(Effect.SLOWNESS);
-
-        Effect speed = restoreEffect(state.previousSpeed, now - state.startedAtMillis);
-        Effect slowness = restoreEffect(state.previousSlowness, now - state.startedAtMillis);
-
-        if (speed != null) {
-            target.addEffect(speed);
-        }
-        if (slowness != null) {
-            target.addEffect(slowness);
-        }
-    }
-
-    private boolean hasClearanceForScale(Player player, double scale) {
-        if (player == null || player.getLevel() == null) {
-            return false;
-        }
-
-        double height = Math.max(1.0D, clampScale(scale) * VANILLA_PLAYER_HEIGHT);
-        double radius = Math.max(0.30D, clampScale(scale) * 0.30D);
-        double[] offsets = new double[] {0.0D, radius, -radius};
-
-        for (double y = 0.10D; y <= height; y += 0.45D) {
-            for (double ox : offsets) {
-                for (double oz : offsets) {
-                    Block block = player.getLevel().getBlock(new Vector3(player.x + ox, player.y + y, player.z + oz));
-                    if (block != null && !block.canPassThrough()) {
-                        return false;
-                    }
-                }
-            }
-        }
-
-        return true;
-    }
-
-    private void applyTags(Player target, ScaleMode mode) {
-        target.addTag(TAG_ACTIVE);
-        target.removeTag(TAG_SMALL);
-        target.removeTag(TAG_BIG);
-        if (mode == ScaleMode.SELF_SMALL) {
-            target.addTag(TAG_SMALL);
-        } else {
-            target.addTag(TAG_BIG);
-        }
+        effect.setDuration(Math.max(40, targetDurationTicks + 20));
+        effect.setAmplifier(Math.max(0, amplifier));
+        effect.setVisible(false);
+        player.addEffect(effect);
     }
 
     private void applyScale(Player player, double scale) {
-        double clampedScale = clampScale(scale);
-        player.setScale((float) clampedScale);
-        invokeOptional(player, "recalculateBoundingBox");
-        invokeOptional(player, "updateMovement");
-        invokeOptional(player, "scheduleUpdate");
-    }
+        boolean success = false;
 
-    private void invokeOptional(Object target, String methodName) {
         try {
-            Method method = target.getClass().getMethod(methodName);
-            method.invoke(target);
+            Method setScale = Entity.class.getMethod("setScale", float.class);
+            setScale.invoke(player, (float) scale);
+            success = true;
         } catch (Throwable ignored) {
-            // optional across forks
         }
-    }
 
-    private Player getOnlinePlayer(UUID uuid) {
-        if (uuid == null) {
-            return null;
-        }
-        for (Player player : plugin.getServer().getOnlinePlayers().values()) {
-            if (uuid.equals(player.getUniqueId())) {
-                return player;
+        if (!success) {
+            try {
+                Method setScale = Entity.class.getMethod("setScale", double.class);
+                setScale.invoke(player, scale);
+                success = true;
+            } catch (Throwable ignored) {
             }
         }
-        return null;
-    }
 
-    private Effect cloneEffect(Player player, int effectId) {
-        if (player == null || !player.hasEffect(effectId)) {
-            return null;
-        }
-        Effect effect = player.getEffect(effectId);
-        return effect == null ? null : effect.clone();
-    }
-
-    private Effect restoreEffect(Effect effect, long elapsedMillis) {
-        if (effect == null) {
-            return null;
+        if (!success) {
+            try {
+                Method setScale = player.getClass().getMethod("setScale", float.class);
+                setScale.invoke(player, (float) scale);
+                success = true;
+            } catch (Throwable ignored) {
+            }
         }
 
-        Effect restored = effect.clone();
-        int elapsedTicks = (int) Math.ceil(elapsedMillis / 50.0D);
-        int remaining = restored.getDuration() - elapsedTicks;
-        if (remaining <= 0) {
-            return null;
+        if (!success) {
+            try {
+                Method setScale = player.getClass().getMethod("setScale", double.class);
+                setScale.invoke(player, scale);
+                success = true;
+            } catch (Throwable ignored) {
+            }
         }
 
-        restored.setDuration(remaining);
-        return restored;
+        recalcBoundingBox(player);
     }
 
-    private double safeScale(Player player) {
+    private double safeGetScale(Player player) {
         try {
-            return player.getScale();
+            Method getScale = Entity.class.getMethod("getScale");
+            Object value = getScale.invoke(player);
+            if (value instanceof Number) {
+                return ((Number) value).doubleValue();
+            }
         } catch (Throwable ignored) {
-            return 1.0D;
+        }
+
+        try {
+            Method getScale = player.getClass().getMethod("getScale");
+            Object value = getScale.invoke(player);
+            if (value instanceof Number) {
+                return ((Number) value).doubleValue();
+            }
+        } catch (Throwable ignored) {
+        }
+
+        return 1.0D;
+    }
+
+    private void recalcBoundingBox(Player player) {
+        try {
+            Method recalc = player.getClass().getMethod("reCalcOffsetBoundingBox");
+            recalc.invoke(player);
+            return;
+        } catch (Throwable ignored) {
+        }
+
+        try {
+            Method recalc = player.getClass().getMethod("recalculateBoundingBox");
+            recalc.invoke(player);
+            return;
+        } catch (Throwable ignored) {
+        }
+
+        try {
+            Method setBoundingBox = Entity.class.getDeclaredMethod("setBoundingBox", AxisAlignedBB.class);
+            setBoundingBox.setAccessible(true);
+
+            double width = 0.6D * safeGetScale(player);
+            double height = 1.8D * safeGetScale(player);
+
+            AxisAlignedBB bb = new AxisAlignedBB(
+                    player.x - width / 2.0D,
+                    player.y,
+                    player.z - width / 2.0D,
+                    player.x + width / 2.0D,
+                    player.y + height,
+                    player.z + width / 2.0D
+            );
+            setBoundingBox.invoke(player, bb);
+        } catch (Throwable ignored) {
         }
     }
 
-    private double scaleFromHeight(double heightBlocks) {
-        if (heightBlocks <= 0.0D) {
-            return 1.0D;
-        }
-        return heightBlocks / VANILLA_PLAYER_HEIGHT;
+    private int currentTick() {
+        return (int) (System.currentTimeMillis() / 50L);
     }
 
-    private double clampScale(double scale) {
-        return Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale));
-    }
+    private static class ScaleState {
+        private final UUID playerId;
+        private final double originalScale;
+        private int expireTick;
+        private final boolean shrunk;
+        private final int amplifier;
 
-    private String formatDouble(double value) {
-        if (Math.abs(value - Math.rint(value)) < 0.0001D) {
-            return String.valueOf((long) Math.rint(value));
-        }
-        return String.format(java.util.Locale.US, "%.2f", value);
-    }
-
-    private enum ScaleMode {
-        SELF_SMALL,
-        TARGET_BIG
-    }
-
-    private static final class ActiveScale {
-        private final UUID targetId;
-        private final UUID casterId;
-        private final String weaponId;
-        private final String targetWorld;
-        private final String casterWorld;
-        private final double previousScale;
-        private final double appliedScale;
-        private final ScaleMode mode;
-        private final long startedAtMillis;
-        private final Effect previousSpeed;
-        private final Effect previousSlowness;
-        private final boolean selfSpeedEffect;
-        private final int selfSpeedAmplifier;
-        private final boolean targetSlownessEffect;
-        private final int targetSlownessAmplifier;
-        private long expiresAtMillis;
-        private long lastNoSpaceNoticeMillis;
-
-        private ActiveScale(UUID targetId,
-                            UUID casterId,
-                            String weaponId,
-                            String targetWorld,
-                            String casterWorld,
-                            double previousScale,
-                            double appliedScale,
-                            ScaleMode mode,
-                            long startedAtMillis,
-                            long expiresAtMillis,
-                            Effect previousSpeed,
-                            Effect previousSlowness,
-                            boolean selfSpeedEffect,
-                            int selfSpeedAmplifier,
-                            boolean targetSlownessEffect,
-                            int targetSlownessAmplifier) {
-            this.targetId = targetId;
-            this.casterId = casterId;
-            this.weaponId = weaponId;
-            this.targetWorld = targetWorld;
-            this.casterWorld = casterWorld;
-            this.previousScale = previousScale;
-            this.appliedScale = appliedScale;
-            this.mode = mode;
-            this.startedAtMillis = startedAtMillis;
-            this.expiresAtMillis = expiresAtMillis;
-            this.previousSpeed = previousSpeed;
-            this.previousSlowness = previousSlowness;
-            this.selfSpeedEffect = selfSpeedEffect;
-            this.selfSpeedAmplifier = selfSpeedAmplifier;
-            this.targetSlownessEffect = targetSlownessEffect;
-            this.targetSlownessAmplifier = targetSlownessAmplifier;
-            this.lastNoSpaceNoticeMillis = 0L;
+        private ScaleState(UUID playerId, double originalScale, int expireTick, boolean shrunk, int amplifier) {
+            this.playerId = playerId;
+            this.originalScale = originalScale;
+            this.expireTick = expireTick;
+            this.shrunk = shrunk;
+            this.amplifier = amplifier;
         }
     }
 }
