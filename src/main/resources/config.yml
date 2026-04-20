@@ -3,14 +3,12 @@
 # Battle Royale легендарки для NukkitMOT
 # ======================================================
 # cooldown-ticks / duration-ticks указаны в тиках.
-# 20 тиков = 1 секунда.
+# 20 тиков = 1 секунда. 
 
 weapons:
   harpoon:
     enabled: true
     type: HARPOON
-
-    # true = в каждом отдельном мире это оружие можно скрафтить только 1 раз
     once-per-world: true
 
     item:
@@ -51,8 +49,6 @@ weapons:
   voodoo_doll:
     enabled: true
     type: VOODOO_DOLL
-
-    # true = в каждом отдельном мире это оружие можно скрафтить только 1 раз
     once-per-world: true
 
     item:
@@ -78,31 +74,14 @@ weapons:
         R: "minecraft:redstone"
 
     ability:
-      # Такой же стартовый кулдаун, как у гарпуна
       cooldown-ticks: 60
-
-      # Сколько держится связь между владельцем и целью
       duration-ticks: 120
-
-      # Жертва получает урон владельца + этот процент сверху
       bonus-damage-percent: 30.0
-
-      # После удара куклой прямой урон по цели не проходит,
-      # вместо этого только накладывается связь
       cancel-hit-damage: true
-
-      # При выходе в другой мир связь рвётся
       require-same-world: true
-
-      # Защитные флаги на смерть
       break-on-owner-death: true
       break-on-target-death: true
-
-      # Если true, владелец может перевесить связь на новую цель,
-      # ударив её куклой заново после отката
       allow-retarget: true
-
-      # Какие причины урона зеркалить на жертву
       mirrored-causes:
         - "ENTITY_ATTACK"
         - "PROJECTILE"
@@ -124,8 +103,6 @@ weapons:
   shrink_ray:
     enabled: true
     type: SHRINK_RAY
-
-    # true = в каждом отдельном мире это оружие можно скрафтить только 1 раз
     once-per-world: true
 
     item:
@@ -151,23 +128,58 @@ weapons:
         D: "minecraft:diamond"
 
     ability:
-      # Такой же стартовый кулдаун, как у остальных легендарок
       cooldown-ticks: 60
-
-      # Сколько секунд держится уменьшение / увеличение
       duration-ticks: 120
-
-      # Дальность луча и шаг проверки попадания
       ray-range: 18.0
       ray-step: 0.35
-
-      # Желаемая высота в блоках, не scale.
-      # Внутри плагин сам переведёт это в scale.
       self-height-blocks: 1.0
       target-height-blocks: 4.0
-
-      # Баффы к движению
       self-speed-effect: true
       self-speed-amplifier: 1
       target-slowness-effect: true
       target-slowness-amplifier: 0
+
+  death_note:
+    enabled: true
+    type: DEATH_NOTE
+    once-per-world: true
+
+    item:
+      material: "minecraft:book"
+      name: "§4§lТетрадь смерти"
+      lore:
+        - "§7ПКМ открывает форму для имени жертвы."
+        - "§7Жертва получит шанс выжить, если угадает владельца."
+        - "§7Работает только по игрокам в выживании."
+        - "§8Легендарное оружие Battle Royale"
+      unbreakable: true
+
+    recipe:
+      enabled: true
+      shape:
+        - "RFR"
+        - "BQB"
+        - "RGR"
+      ingredients:
+        R: "minecraft:redstone"
+        F: "minecraft:feather"
+        B: "minecraft:book"
+        Q: "minecraft:quartz"
+        G: "minecraft:gold_ingot"
+
+    ability:
+      # Такой же стартовый кулдаун, как и у остальных легендарок
+      cooldown-ticks: 60
+
+      # Сколько времени у жертвы на отгадку владельца
+      duration-ticks: 300
+
+      # Сколько неверных имён можно написать в чат
+      attempts: 3
+
+      # Безопасные ограничения
+      only-survival-targets: true
+      require-same-world: true
+      bind-to-craft-world: true
+      break-on-owner-death: true
+      break-on-target-death: true
