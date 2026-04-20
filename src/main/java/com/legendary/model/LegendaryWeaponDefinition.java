@@ -35,7 +35,7 @@ public class LegendaryWeaponDefinition {
         this.type = type == null ? "UNKNOWN" : type.toUpperCase();
         this.material = material;
         this.displayName = displayName;
-        this.lore = lore == null ? Collections.emptyList() : Collections.unmodifiableList(new ArrayList<>(lore));
+        this.lore = lore == null ? Collections.<String>emptyList() : Collections.unmodifiableList(new ArrayList<>(lore));
         this.unbreakable = unbreakable;
         this.recipe = recipe;
         this.ability = ability;
@@ -93,6 +93,10 @@ public class LegendaryWeaponDefinition {
         return "SHRINK_RAY".equalsIgnoreCase(type) || "SHRINK".equalsIgnoreCase(type);
     }
 
+    public boolean isDeathNote() {
+        return "DEATH_NOTE".equalsIgnoreCase(type) || "NOTEBOOK".equalsIgnoreCase(type);
+    }
+
     public static class RecipeDefinition {
 
         private final boolean enabled;
@@ -101,9 +105,9 @@ public class LegendaryWeaponDefinition {
 
         public RecipeDefinition(boolean enabled, List<String> shape, Map<Character, String> ingredients) {
             this.enabled = enabled;
-            this.shape = shape == null ? Collections.emptyList() : Collections.unmodifiableList(new ArrayList<>(shape));
+            this.shape = shape == null ? Collections.<String>emptyList() : Collections.unmodifiableList(new ArrayList<>(shape));
             this.ingredients = ingredients == null
-                    ? Collections.emptyMap()
+                    ? Collections.<Character, String>emptyMap()
                     : Collections.unmodifiableMap(new LinkedHashMap<>(ingredients));
         }
 
@@ -154,6 +158,10 @@ public class LegendaryWeaponDefinition {
         private final boolean targetSlownessEffect;
         private final int targetSlownessAmplifier;
 
+        private final int attempts;
+        private final boolean onlySurvivalTargets;
+        private final boolean bindToCraftWorld;
+
         public AbilityDefinition(int cooldownTicks,
                                  double projectileSpeed,
                                  double pullSpeed,
@@ -181,7 +189,10 @@ public class LegendaryWeaponDefinition {
                                  boolean selfSpeedEffect,
                                  int selfSpeedAmplifier,
                                  boolean targetSlownessEffect,
-                                 int targetSlownessAmplifier) {
+                                 int targetSlownessAmplifier,
+                                 int attempts,
+                                 boolean onlySurvivalTargets,
+                                 boolean bindToCraftWorld) {
             this.cooldownTicks = cooldownTicks;
             this.projectileSpeed = projectileSpeed;
             this.pullSpeed = pullSpeed;
@@ -202,7 +213,7 @@ public class LegendaryWeaponDefinition {
             this.breakOnTargetDeath = breakOnTargetDeath;
             this.allowRetarget = allowRetarget;
             this.mirroredCauses = mirroredCauses == null
-                    ? Collections.emptyList()
+                    ? Collections.<String>emptyList()
                     : Collections.unmodifiableList(new ArrayList<>(mirroredCauses));
             this.rayRange = rayRange;
             this.rayStep = rayStep;
@@ -212,6 +223,9 @@ public class LegendaryWeaponDefinition {
             this.selfSpeedAmplifier = selfSpeedAmplifier;
             this.targetSlownessEffect = targetSlownessEffect;
             this.targetSlownessAmplifier = targetSlownessAmplifier;
+            this.attempts = attempts;
+            this.onlySurvivalTargets = onlySurvivalTargets;
+            this.bindToCraftWorld = bindToCraftWorld;
         }
 
         public int getCooldownTicks() {
@@ -324,6 +338,18 @@ public class LegendaryWeaponDefinition {
 
         public int getTargetSlownessAmplifier() {
             return targetSlownessAmplifier;
+        }
+
+        public int getAttempts() {
+            return attempts;
+        }
+
+        public boolean isOnlySurvivalTargets() {
+            return onlySurvivalTargets;
+        }
+
+        public boolean isBindToCraftWorld() {
+            return bindToCraftWorld;
         }
     }
 }
