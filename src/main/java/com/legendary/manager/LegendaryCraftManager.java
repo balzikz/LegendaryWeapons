@@ -1,8 +1,11 @@
 package com.legendary.manager;
 
 import cn.nukkit.Player;
+import cn.nukkit.Server;
+import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.inventory.ShapedRecipe;
 import cn.nukkit.item.Item;
+import cn.nukkit.scheduler.NukkitRunnable;
 import cn.nukkit.utils.Config;
 import com.legendary.LegendaryItems;
 import com.legendary.model.LegendaryWeaponDefinition;
@@ -108,8 +111,9 @@ public class LegendaryCraftManager {
 
     public void markCrafted(String worldName, String legendaryId) {
         List<String> crafted = new ArrayList<>(craftedData.getStringList("crafted." + worldName));
-        if (!crafted.contains(legendaryId.toLowerCase())) {
-            crafted.add(legendaryId.toLowerCase());
+        String normalized = legendaryId.toLowerCase();
+        if (!crafted.contains(normalized)) {
+            crafted.add(normalized);
             craftedData.set("crafted." + worldName, crafted);
             craftedData.save();
         }
@@ -128,7 +132,66 @@ public class LegendaryCraftManager {
         }
 
         markCrafted(worldName, legendaryId);
-        player.sendMessage("§6[Legendary] §fТеперь в этом мире оружие §e" + definition.getDisplayName() + "§f считается созданным.");
+        scheduleWorldBinding(player, definition, worldName);
+        announceCraft(player, definition, worldName);
         return true;
+    }
+
+    private void announceCraft(Player crafter, LegendaryWeaponDefinition definition, String worldName) {
+        String message = "§6§l[Legendary] §fВ мире §e" + worldName + "§f создано оружие §r"
+                + definition.getDisplayName() + "§f. Владелец: §e" + crafter.getName();
+
+        Server server = plugin.getServer();
+        for (Player online : server.getOnlinePlayers().values()) {
+            if (online.getLevel() != null && worldName.equalsIgnoreCase(online.getLevel().getName())) {
+                online.sendMessage(message);
+            }
+        }
+        plugin.getLogger().info("[Legendary] " + crafter.getName() + " скрафтил " + definition.getId() + " в мире " + worldName);
+    }
+
+    private void scheduleWorldBinding(final Player player, final LegendaryWeaponDefinition definition, final String worldName) {
+        if (definition.getAbility() == null || !definition.getAbility().isBindToCraftWorld()) {
+            return;
+        }
+
+        new NukkitRunnable() {
+            @Override
+            public void run() {
+                if (!bindWorldTagInInventory(player, definition.getId(), worldName)) {
+                    new NukkitRunnable() {
+                        @Override
+                        public void run() {
+                            bindWorldTagInInventory(player, definition.getId(), worldName);
+                        }
+                    }.runTaskLater(plugin, 5);
+                }
+            }
+        }.runTaskLater(plugin, 1);
+    }
+
+    private boolean bindWorldTagInInventory(Player player, String legendaryId, String worldName) {
+        if (player == null || !player.isOnline() || player.isClosed()) {
+            return false;
+        }
+
+        PlayerInventory inventory = player.getInventory();
+        for (int slot = 0; slot < inventory.getSize(); slot++) {
+            Item item = inventory.getItem(slot);
+            if (!itemManager.isLegendary(item, legendaryId)) {
+                continue;
+            }
+            if (itemManager.getBoundWorld(item) != null) {
+                return true;
+            }
+
+            Item updated = item.clone();
+            itemManager.bindItemToWorld(updated, worldName);
+            inventory.setItem(slot, updated);
+            player.sendMessage("§8[Legendary] §7Предмет §r" + updated.getCustomName() + "§7 привязан к миру §e" + worldName + "§7.");
+            return true;
+        }
+
+        return false;
     }
 }
