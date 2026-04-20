@@ -1,4 +1,4 @@
-package com.legendary.commands;
+package com.legendary.command;
 
 import cn.nukkit.Player;
 import cn.nukkit.command.Command;
@@ -109,6 +109,12 @@ public class LegCommand implements CommandExecutor {
             sender.sendMessage("§7Дальность луча: §e" + formatDouble(ability.getRayRange()) + " блоков");
             sender.sendMessage("§7Себе эффект: " + readablePotionBoost(ability.isSelfSpeedEffect(), "Скорость", ability.getSelfSpeedAmplifier()));
             sender.sendMessage("§7Цели эффект: " + readablePotionBoost(ability.isTargetSlownessEffect(), "Замедление", ability.getTargetSlownessAmplifier()));
+        } else if (definition.isDeathNote() && ability != null) {
+            sender.sendMessage("§7Эффект: §fПКМ открывает форму, где владелец вписывает имя жертвы.");
+            sender.sendMessage("§7Шанс жертвы: §e" + formatDouble(ability.getDurationTicks() / 20.0D) + " сек §7и §e" + ability.getAttempts() + " попытки");
+            sender.sendMessage("§7Только выживание: " + (ability.isOnlySurvivalTargets() ? "§aда" : "§cнет"));
+            sender.sendMessage("§7Привязка к миру крафта: " + (ability.isBindToCraftWorld() ? "§aда" : "§cнет"));
+            sender.sendMessage("§7Требуется один мир: " + (ability.isRequireSameWorld() ? "§aда" : "§cнет"));
         }
 
         sender.sendMessage("§7Описание:");
@@ -185,6 +191,9 @@ public class LegCommand implements CommandExecutor {
         }
         if (definition.isShrinkRay()) {
             return "Shrink Ray";
+        }
+        if (definition.isDeathNote()) {
+            return "Тетрадь смерти";
         }
         return definition.getType().toLowerCase(Locale.ROOT);
     }
