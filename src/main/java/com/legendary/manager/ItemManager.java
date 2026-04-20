@@ -16,6 +16,9 @@ import java.util.Map;
 
 public class ItemManager {
 
+    private static final String TAG_LEGENDARY_ID = "legendary_id";
+    private static final String TAG_BOUND_WORLD = "legendary_bound_world";
+
     private final LegendaryItems plugin;
     private final Map<String, LegendaryWeaponDefinition> definitions = new LinkedHashMap<>();
 
@@ -114,7 +117,10 @@ public class ItemManager {
                     config.getBoolean(path + ".ability.self-speed-effect", true),
                     config.getInt(path + ".ability.self-speed-amplifier", 1),
                     config.getBoolean(path + ".ability.target-slowness-effect", true),
-                    config.getInt(path + ".ability.target-slowness-amplifier", 0)
+                    config.getInt(path + ".ability.target-slowness-amplifier", 0),
+                    config.getInt(path + ".ability.attempts", 3),
+                    config.getBoolean(path + ".ability.only-survival-targets", true),
+                    config.getBoolean(path + ".ability.bind-to-craft-world", false)
             );
 
             LegendaryWeaponDefinition definition = new LegendaryWeaponDefinition(
@@ -153,10 +159,10 @@ public class ItemManager {
             return null;
         }
         CompoundTag tag = item.getNamedTag();
-        if (tag == null || !tag.contains("legendary_id")) {
+        if (tag == null || !tag.contains(TAG_LEGENDARY_ID)) {
             return null;
         }
-        return tag.getString("legendary_id").toLowerCase();
+        return tag.getString(TAG_LEGENDARY_ID).toLowerCase();
     }
 
     public boolean isLegendary(Item item) {
@@ -166,6 +172,28 @@ public class ItemManager {
     public boolean isLegendary(Item item, String id) {
         String legendaryId = getLegendaryId(item);
         return legendaryId != null && legendaryId.equalsIgnoreCase(id);
+    }
+
+    public String getBoundWorld(Item item) {
+        if (item == null || !item.hasCompoundTag()) {
+            return null;
+        }
+        CompoundTag tag = item.getNamedTag();
+        if (tag == null || !tag.contains(TAG_BOUND_WORLD)) {
+            return null;
+        }
+        String world = tag.getString(TAG_BOUND_WORLD);
+        return world == null || world.trim().isEmpty() ? null : world;
+    }
+
+    public Item bindItemToWorld(Item item, String worldName) {
+        if (item == null || worldName == null || worldName.trim().isEmpty()) {
+            return item;
+        }
+        CompoundTag tag = item.hasCompoundTag() ? item.getNamedTag() : new CompoundTag();
+        tag.putString(TAG_BOUND_WORLD, worldName);
+        item.setNamedTag(tag);
+        return item;
     }
 
     public Item createItem(String id) {
@@ -192,7 +220,7 @@ public class ItemManager {
 
         CompoundTag tag = item.hasCompoundTag() ? item.getNamedTag() : new CompoundTag();
         tag.putBoolean("legendary_weapon", true);
-        tag.putString("legendary_id", definition.getId());
+        tag.putString(TAG_LEGENDARY_ID, definition.getId());
         tag.putString("legendary_type", definition.getType());
         if (definition.isUnbreakable()) {
             tag.putBoolean("Unbreakable", true);
@@ -229,6 +257,9 @@ public class ItemManager {
         if ("SHRINK_RAY".equalsIgnoreCase(type) || "SHRINK".equalsIgnoreCase(type)) {
             return "minecraft:blaze_rod";
         }
+        if ("DEATH_NOTE".equalsIgnoreCase(type) || "NOTEBOOK".equalsIgnoreCase(type)) {
+            return "minecraft:book";
+        }
         return "minecraft:totem_of_undying";
     }
 
@@ -238,6 +269,9 @@ public class ItemManager {
         }
         if (definition.isShrinkRay()) {
             return Item.get(369);
+        }
+        if (definition.isDeathNote()) {
+            return Item.get(340);
         }
         return Item.get(450);
     }
