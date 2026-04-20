@@ -1,4 +1,4 @@
-package com.legendary.listeners;
+package com.legendary.listener;
 
 import cn.nukkit.Player;
 import cn.nukkit.event.EventHandler;
@@ -8,7 +8,9 @@ import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.ProjectileHitEvent;
 import cn.nukkit.event.inventory.CraftItemEvent;
+import cn.nukkit.event.player.PlayerChatEvent;
 import cn.nukkit.event.player.PlayerDeathEvent;
+import cn.nukkit.event.player.PlayerFormRespondedEvent;
 import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.event.player.PlayerQuitEvent;
 import cn.nukkit.event.player.PlayerTeleportEvent;
@@ -51,6 +53,12 @@ public class LegendaryListener implements Listener {
         if (definition.isShrinkRay()) {
             event.setCancelled();
             plugin.getShrinkRayManager().handleUse(event.getPlayer(), definition);
+            return;
+        }
+
+        if (definition.isDeathNote()) {
+            event.setCancelled();
+            plugin.getDeathNoteManager().handleUse(event.getPlayer(), definition);
         }
     }
 
@@ -100,6 +108,16 @@ public class LegendaryListener implements Listener {
     }
 
     @EventHandler
+    public void onFormResponse(PlayerFormRespondedEvent event) {
+        plugin.getDeathNoteManager().handleFormResponse(event);
+    }
+
+    @EventHandler
+    public void onChat(PlayerChatEvent event) {
+        plugin.getDeathNoteManager().handleChatGuess(event);
+    }
+
+    @EventHandler
     public void onTeleport(PlayerTeleportEvent event) {
         if (event.getFrom() == null || event.getTo() == null) {
             return;
@@ -111,6 +129,7 @@ public class LegendaryListener implements Listener {
         plugin.getHarpoonManager().cleanupPlayer(event.getPlayer());
         plugin.getVoodooManager().cleanupPlayer(event.getPlayer());
         plugin.getShrinkRayManager().cleanupPlayer(event.getPlayer());
+        plugin.getDeathNoteManager().cleanupPlayer(event.getPlayer());
     }
 
     @EventHandler
@@ -118,6 +137,7 @@ public class LegendaryListener implements Listener {
         plugin.getHarpoonManager().cleanupPlayer(event.getPlayer());
         plugin.getVoodooManager().handleQuit(event);
         plugin.getShrinkRayManager().cleanupPlayer(event.getPlayer());
+        plugin.getDeathNoteManager().handleQuit(event);
         plugin.getCooldownManager().clear(event.getPlayer());
     }
 
@@ -126,6 +146,7 @@ public class LegendaryListener implements Listener {
         plugin.getHarpoonManager().cleanupPlayer(event.getEntity());
         plugin.getVoodooManager().handleDeath(event);
         plugin.getShrinkRayManager().cleanupPlayer(event.getEntity());
+        plugin.getDeathNoteManager().handleDeath(event);
         plugin.getCooldownManager().clear(event.getEntity());
     }
 }
