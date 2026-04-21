@@ -59,22 +59,31 @@ public class LegendaryListener implements Listener {
         if (definition.isDeathNote()) {
             event.setCancelled();
             plugin.getDeathNoteManager().handleUse(event.getPlayer(), definition);
+            return;
+        }
+
+        if (definition.isBeeLauncher()) {
+            event.setCancelled();
+            plugin.getBeeLauncherManager().useBeeLauncher(event.getPlayer(), definition);
         }
     }
 
     @EventHandler
     public void onProjectileHit(ProjectileHitEvent event) {
         plugin.getHarpoonManager().handleProjectileHit(event);
+        plugin.getBeeLauncherManager().handleProjectileHit(event);
     }
 
     @EventHandler
     public void onProjectileDamage(EntityDamageByChildEntityEvent event) {
         plugin.getHarpoonManager().handleProjectileDamage(event);
+        plugin.getBeeLauncherManager().handleProjectileDamage(event);
     }
 
     @EventHandler
     public void onMelee(EntityDamageByEntityEvent event) {
         plugin.getVoodooManager().handleMarkHit(event);
+        plugin.getBeeLauncherManager().handleBeeDamage(event);
     }
 
     @EventHandler
@@ -97,6 +106,7 @@ public class LegendaryListener implements Listener {
     public void onDamage(EntityDamageEvent event) {
         if (event.getEntity() instanceof Player
                 && event.getCause() == EntityDamageEvent.DamageCause.FALL) {
+
             Player player = (Player) event.getEntity();
             if (plugin.getHarpoonManager().hasFallImmunity(player)) {
                 event.setCancelled();
@@ -130,6 +140,7 @@ public class LegendaryListener implements Listener {
         plugin.getVoodooManager().cleanupPlayer(event.getPlayer());
         plugin.getShrinkRayManager().cleanupPlayer(event.getPlayer());
         plugin.getDeathNoteManager().cleanupPlayer(event.getPlayer());
+        plugin.getBeeLauncherManager().cleanupPlayer(event.getPlayer());
     }
 
     @EventHandler
@@ -138,6 +149,7 @@ public class LegendaryListener implements Listener {
         plugin.getVoodooManager().handleQuit(event);
         plugin.getShrinkRayManager().cleanupPlayer(event.getPlayer());
         plugin.getDeathNoteManager().handleQuit(event);
+        plugin.getBeeLauncherManager().cleanupPlayer(event.getPlayer());
         plugin.getCooldownManager().clear(event.getPlayer());
     }
 
@@ -147,6 +159,7 @@ public class LegendaryListener implements Listener {
         plugin.getVoodooManager().handleDeath(event);
         plugin.getShrinkRayManager().cleanupPlayer(event.getEntity());
         plugin.getDeathNoteManager().handleDeath(event);
+        plugin.getBeeLauncherManager().cleanupPlayer(event.getEntity());
         plugin.getCooldownManager().clear(event.getEntity());
     }
 }
