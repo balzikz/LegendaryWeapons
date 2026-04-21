@@ -3,7 +3,7 @@
 # Battle Royale легендарки для NukkitMOT
 # ======================================================
 # cooldown-ticks / duration-ticks указаны в тиках.
-# 20 тиков = 1 секунда. 
+# 20 тиков = 1 секунда.
 
 weapons:
   harpoon:
@@ -168,18 +168,48 @@ weapons:
         G: "minecraft:gold_ingot"
 
     ability:
-      # Такой же стартовый кулдаун, как и у остальных легендарок
       cooldown-ticks: 60
-
-      # Сколько времени у жертвы на отгадку владельца
       duration-ticks: 300
-
-      # Сколько неверных имён можно написать в чат
       attempts: 3
-
-      # Безопасные ограничения
       only-survival-targets: true
       require-same-world: true
       bind-to-craft-world: true
       break-on-owner-death: true
       break-on-target-death: true
+
+  bee_launcher:
+    enabled: true
+    type: BEE_LAUNCHER
+    once-per-world: true
+
+    item:
+      material: "minecraft:carrot_on_a_stick"
+      name: "§e§lПчеломёт"
+      lore:
+        - "§7ПКМ — выстреливает медленным ульем-яйцом."
+        - "§7В месте попадания вылетает рой пчёл."
+        - "§7Пчёлы атакуют игроков, кроме владельца."
+        - "§8Легендарное оружие Battle Royale"
+      unbreakable: true
+
+    recipe:
+      enabled: true
+      shape:
+        - "HHH"
+        - "SGS"
+        - " R "
+      ingredients:
+        H: "minecraft:honeycomb"
+        S: "minecraft:string"
+        G: "minecraft:gold_ingot"
+        R: "minecraft:carrot_on_a_stick"
+
+    ability:
+      cooldown-ticks: 60
+      projectile-speed: 0.65
+      max-flight-ticks: 80
+      duration-ticks: 600
+      bee-count-min: 4
+      bee-count-max: 7
+      bee-search-range: 18.0
+      bee-spawn-radius: 1.25
