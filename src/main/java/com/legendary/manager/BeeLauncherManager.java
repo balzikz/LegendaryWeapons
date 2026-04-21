@@ -421,31 +421,39 @@ public class BeeLauncherManager {
     }
 
     private void clearBeeTarget(Entity bee, UUID ownerId) {
-        if (bee == null) {
-            return;
+    if (bee == null) {
+        return;
+    }
+
+    try {
+        Field targetField = Entity.class.getField("targetEntity");
+        Object target = targetField.get(bee);
+
+        boolean shouldClear = false;
+
+        if (target == null || !(target instanceof Entity)) {
+            shouldClear = true;
+        } else if (target instanceof Player) {
+            shouldClear = ownerId.equals(((Player) target).getUniqueId());
         }
 
-        try {
-            Field targetField = Entity.class.getField("targetEntity");
-            Object target = targetField.get(bee);
-            if (target == null || !(target instanceof Entity)
-                    || ownerId.equals(((Entity) target).getUniqueId())) {
-                targetField.set(bee, null);
-            }
-        } catch (Exception ignored) {
+        if (shouldClear) {
+            targetField.set(bee, null);
         }
+    } catch (Exception ignored) {
+    }
 
-        try {
-            Field angryTo = bee.getClass().getField("isAngryTo");
-            Object value = angryTo.get(bee);
-            if (value instanceof Number && ((Number) value).longValue() >= 0L) {
-                angryTo.setLong(bee, -1L);
-            }
-        } catch (Exception ignored) {
+    try {
+        Field angryTo = bee.getClass().getField("isAngryTo");
+        Object value = angryTo.get(bee);
+        if (value instanceof Number && ((Number) value).longValue() >= 0L) {
+            angryTo.setLong(bee, -1L);
         }
+    } catch (Exception ignored) {
+    }
 
-        clearMemory(bee, "ATTACK_TARGET");
-        setBeeAngry(bee, false);
+    clearMemory(bee, "ATTACK_TARGET");
+    setBeeAngry(bee, false);
     }
 
     private void forceBeeTarget(Entity bee, Entity target) {
