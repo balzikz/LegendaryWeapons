@@ -4,6 +4,7 @@ import cn.nukkit.command.PluginCommand;
 import cn.nukkit.plugin.PluginBase;
 import com.legendary.command.LegCommand;
 import com.legendary.listener.LegendaryListener;
+import com.legendary.manager.BeeLauncherManager;
 import com.legendary.manager.CooldownManager;
 import com.legendary.manager.DeathNoteManager;
 import com.legendary.manager.HarpoonManager;
@@ -23,6 +24,7 @@ public class LegendaryItems extends PluginBase {
     private VoodooManager voodooManager;
     private ShrinkRayManager shrinkRayManager;
     private DeathNoteManager deathNoteManager;
+    private BeeLauncherManager beeLauncherManager;
 
     @Override
     public void onEnable() {
@@ -39,6 +41,7 @@ public class LegendaryItems extends PluginBase {
         this.voodooManager = new VoodooManager(this, cooldownManager);
         this.shrinkRayManager = new ShrinkRayManager(this, cooldownManager);
         this.deathNoteManager = new DeathNoteManager(this, cooldownManager);
+        this.beeLauncherManager = new BeeLauncherManager(this, cooldownManager);
 
         this.craftManager = new LegendaryCraftManager(this, itemManager);
         this.craftManager.registerRecipes();
@@ -52,7 +55,7 @@ public class LegendaryItems extends PluginBase {
             this.getLogger().warning("Команда /leg не найдена в plugin.yml");
         }
 
-        this.getLogger().info("§aLegendaryItems включён. Оружия: Гарпун, Кукла Вуду, Shrink Ray, Тетрадь смерти.");
+        this.getLogger().info("§aLegendaryItems включён. Оружия: Гарпун, Кукла Вуду, Shrink Ray, Тетрадь смерти, Пчеломёт.");
     }
 
     @Override
@@ -65,6 +68,9 @@ public class LegendaryItems extends PluginBase {
         }
         if (deathNoteManager != null) {
             deathNoteManager.shutdown();
+        }
+        if (beeLauncherManager != null) {
+            beeLauncherManager.shutdown();
         }
     }
 
@@ -98,5 +104,9 @@ public class LegendaryItems extends PluginBase {
 
     public DeathNoteManager getDeathNoteManager() {
         return deathNoteManager;
+    }
+
+    public BeeLauncherManager getBeeLauncherManager() {
+        return beeLauncherManager;
     }
 }
