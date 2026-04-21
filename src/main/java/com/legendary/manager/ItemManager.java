@@ -20,7 +20,7 @@ public class ItemManager {
     private static final String TAG_BOUND_WORLD = "legendary_bound_world";
 
     private final LegendaryItems plugin;
-    private final Map<String, LegendaryWeaponDefinition> definitions = new LinkedHashMap<>();
+    private final Map<String, LegendaryWeaponDefinition> definitions = new LinkedHashMap<String, LegendaryWeaponDefinition>();
 
     public ItemManager(LegendaryItems plugin) {
         this.plugin = plugin;
@@ -45,16 +45,17 @@ public class ItemManager {
             String defaultMaterial = defaultMaterial(type);
             String material = config.getString(path + ".item.material", defaultMaterial);
             String displayName = config.getString(path + ".item.name", "§6Легендарное оружие");
-            List<String> lore = new ArrayList<>(config.getStringList(path + ".item.lore"));
+            List<String> lore = new ArrayList<String>(config.getStringList(path + ".item.lore"));
             boolean unbreakable = config.getBoolean(path + ".item.unbreakable", true);
 
-            List<String> shape = new ArrayList<>(config.getStringList(path + ".recipe.shape"));
+            List<String> shape = new ArrayList<String>(config.getStringList(path + ".recipe.shape"));
             ConfigSection ingredientsSection = config.getSection(path + ".recipe.ingredients");
-            Map<Character, String> ingredients = new LinkedHashMap<>();
+            Map<Character, String> ingredients = new LinkedHashMap<Character, String>();
             if (ingredientsSection != null) {
                 for (String symbol : ingredientsSection.getKeys(false)) {
                     if (symbol.length() != 1) {
-                        plugin.getLogger().warning("Символ ингредиента должен быть одной буквой: " + path + ".recipe.ingredients." + symbol);
+                        plugin.getLogger().warning("Символ ингредиента должен быть одной буквой: "
+                                + path + ".recipe.ingredients." + symbol);
                         continue;
                     }
                     ingredients.put(symbol.charAt(0), ingredientsSection.getString(symbol));
@@ -67,7 +68,7 @@ public class ItemManager {
                     ingredients
             );
 
-            List<String> mirroredCauses = new ArrayList<>(config.getStringList(path + ".ability.mirrored-causes"));
+            List<String> mirroredCauses = new ArrayList<String>(config.getStringList(path + ".ability.mirrored-causes"));
             if (mirroredCauses.isEmpty() && ("VOODOO_DOLL".equalsIgnoreCase(type) || "VOODOO".equalsIgnoreCase(type))) {
                 mirroredCauses.addAll(Arrays.asList(
                         "ENTITY_ATTACK",
@@ -91,13 +92,13 @@ public class ItemManager {
 
             LegendaryWeaponDefinition.AbilityDefinition ability = new LegendaryWeaponDefinition.AbilityDefinition(
                     config.getInt(path + ".ability.cooldown-ticks", 60),
-                    config.getDouble(path + ".ability.projectile-speed", 1.8),
-                    config.getDouble(path + ".ability.pull-speed", 1.15),
+                    config.getDouble(path + ".ability.projectile-speed", 1.8D),
+                    config.getDouble(path + ".ability.pull-speed", 1.15D),
                     config.getInt(path + ".ability.max-flight-ticks", 40),
                     config.getInt(path + ".ability.max-pull-ticks", 80),
-                    config.getDouble(path + ".ability.min-distance", 1.75),
-                    config.getDouble(path + ".ability.vertical-cap", 0.95),
-                    config.getDouble(path + ".ability.step-boost", 0.42),
+                    config.getDouble(path + ".ability.min-distance", 1.75D),
+                    config.getDouble(path + ".ability.vertical-cap", 0.95D),
+                    config.getDouble(path + ".ability.step-boost", 0.42D),
                     config.getInt(path + ".ability.stuck-ticks", 14),
                     config.getInt(path + ".ability.fall-immunity-ticks", 20),
                     config.getBoolean(path + ".ability.pull-players", true),
@@ -120,7 +121,11 @@ public class ItemManager {
                     config.getInt(path + ".ability.target-slowness-amplifier", 0),
                     config.getInt(path + ".ability.attempts", 3),
                     config.getBoolean(path + ".ability.only-survival-targets", true),
-                    config.getBoolean(path + ".ability.bind-to-craft-world", false)
+                    config.getBoolean(path + ".ability.bind-to-craft-world", false),
+                    config.getInt(path + ".ability.bee-count-min", 4),
+                    config.getInt(path + ".ability.bee-count-max", 7),
+                    config.getDouble(path + ".ability.bee-search-range", 18.0D),
+                    config.getDouble(path + ".ability.bee-spawn-radius", 1.25D)
             );
 
             LegendaryWeaponDefinition definition = new LegendaryWeaponDefinition(
@@ -158,6 +163,7 @@ public class ItemManager {
         if (item == null || !item.hasCompoundTag()) {
             return null;
         }
+
         CompoundTag tag = item.getNamedTag();
         if (tag == null || !tag.contains(TAG_LEGENDARY_ID)) {
             return null;
@@ -178,10 +184,12 @@ public class ItemManager {
         if (item == null || !item.hasCompoundTag()) {
             return null;
         }
+
         CompoundTag tag = item.getNamedTag();
         if (tag == null || !tag.contains(TAG_BOUND_WORLD)) {
             return null;
         }
+
         String world = tag.getString(TAG_BOUND_WORLD);
         return world == null || world.trim().isEmpty() ? null : world;
     }
@@ -190,6 +198,7 @@ public class ItemManager {
         if (item == null || worldName == null || worldName.trim().isEmpty()) {
             return item;
         }
+
         CompoundTag tag = item.hasCompoundTag() ? item.getNamedTag() : new CompoundTag();
         tag.putString(TAG_BOUND_WORLD, worldName);
         item.setNamedTag(tag);
@@ -206,7 +215,8 @@ public class ItemManager {
         try {
             item = Item.fromString(definition.getMaterial());
         } catch (Exception e) {
-            plugin.getLogger().warning("Не удалось создать предмет из material='" + definition.getMaterial() + "' для " + definition.getId());
+            plugin.getLogger().warning("Не удалось создать предмет из material='" + definition.getMaterial()
+                    + "' для " + definition.getId());
             item = createFallbackItem(definition);
         }
 
@@ -260,6 +270,9 @@ public class ItemManager {
         if ("DEATH_NOTE".equalsIgnoreCase(type) || "NOTEBOOK".equalsIgnoreCase(type)) {
             return "minecraft:book";
         }
+        if ("BEE_LAUNCHER".equalsIgnoreCase(type) || "BEE_GUN".equalsIgnoreCase(type)) {
+            return "minecraft:carrot_on_a_stick";
+        }
         return "minecraft:totem_of_undying";
     }
 
@@ -272,6 +285,9 @@ public class ItemManager {
         }
         if (definition.isDeathNote()) {
             return Item.get(340);
+        }
+        if (definition.isBeeLauncher()) {
+            return Item.get(398);
         }
         return Item.get(450);
     }
