@@ -115,6 +115,12 @@ public class LegCommand implements CommandExecutor {
             sender.sendMessage("§7Только выживание: " + (ability.isOnlySurvivalTargets() ? "§aда" : "§cнет"));
             sender.sendMessage("§7Привязка к миру крафта: " + (ability.isBindToCraftWorld() ? "§aда" : "§cнет"));
             sender.sendMessage("§7Требуется один мир: " + (ability.isRequireSameWorld() ? "§aда" : "§cнет"));
+        } else if (definition.isBeeLauncher() && ability != null) {
+            sender.sendMessage("§7Эффект: §fСтреляет медленным яйцом, а на месте попадания выпускает рой пчёл.");
+            sender.sendMessage("§7Пчёл в рое: §e" + ability.getBeeCountMin() + " - " + ability.getBeeCountMax());
+            sender.sendMessage("§7Время жизни роя: §e" + formatDouble(ability.getDurationTicks() / 20.0D) + " сек");
+            sender.sendMessage("§7Скорость яйца: §e" + formatDouble(ability.getProjectileSpeed()));
+            sender.sendMessage("§7Дистанция поиска цели: §e" + formatDouble(ability.getBeeSearchRange()) + " блоков");
         }
 
         sender.sendMessage("§7Описание:");
@@ -194,6 +200,9 @@ public class LegCommand implements CommandExecutor {
         }
         if (definition.isDeathNote()) {
             return "Тетрадь смерти";
+        }
+        if (definition.isBeeLauncher()) {
+            return "Пчеломёт";
         }
         return definition.getType().toLowerCase(Locale.ROOT);
     }
