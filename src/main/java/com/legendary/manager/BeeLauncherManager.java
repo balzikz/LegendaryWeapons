@@ -571,4 +571,148 @@ public class BeeLauncherManager {
 
             for (Method method : storage.getClass().getMethods()) {
                 if ("put".equals(method.getName()) && method.getParameterTypes().length == 2) {
-                    method.invoke(storage, me
+                    method.invoke(storage, memoryType, null);
+                    return;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private Object getMemoryStorage(Entity bee) {
+        try {
+            Method method = bee.getClass().getMethod("getMemoryStorage");
+            return method.invoke(bee);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private Object getCoreMemoryType(String memoryName) {
+        try {
+            Class<?> coreMemoryTypes = Class.forName("cn.nukkit.entity.ai.memory.CoreMemoryTypes");
+            Field field = coreMemoryTypes.getField(memoryName);
+            return field.get(null);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private void nudgeBeeAwayFromOwner(Entity bee, Player owner) {
+        double dx = bee.x - owner.x;
+        double dz = bee.z - owner.z;
+        double len = Math.sqrt(dx * dx + dz * dz);
+
+        if (len < 0.001D) {
+            dx = ThreadLocalRandom.current().nextDouble(-1.0D, 1.0D);
+            dz = ThreadLocalRandom.current().nextDouble(-1.0D, 1.0D);
+            len = Math.sqrt(dx * dx + dz * dz);
+        }
+
+        double mx = (dx / len) * 0.28D;
+        double mz = (dz / len) * 0.28D;
+
+        bee.setMotion(new Vector3(mx, 0.12D, mz));
+    }
+
+    private void protectOwnerFromPoison(BeeRecord record) {
+        Player owner = findOnlineOwner(record.ownerId);
+        if (owner == null || owner.isClosed() || !owner.isAlive()) {
+            return;
+        }
+
+        try {
+            owner.removeEffect(19); // poison
+        } catch (Exception ignored) {
+        }
+    }
+
+    private LegendaryWeaponDefinition resolveDefinition(EntityProjectile projectile) {
+        if (projectile == null || projectile.namedTag == null || !projectile.namedTag.contains("legendary_id")) {
+            return null;
+        }
+        return plugin.getItemManager().getDefinition(projectile.namedTag.getString("legendary_id"));
+    }
+
+    private boolean isBeeProjectile(EntityProjectile projectile) {
+        return projectile != null
+                && projectile.namedTag != null
+                && projectile.namedTag.getBoolean(BEE_PROJECTILE_TAG);
+    }
+
+    private boolean markProjectileProcessed(long projectileId) {
+        long now = System.currentTimeMillis();
+        Long existing = processedProjectiles.get(projectileId);
+        if (existing != null && existing.longValue() > now) {
+            return false;
+        }
+        processedProjectiles.put(projectileId, now + 15000L);
+        return true;
+    }
+
+    private void startMaintenanceTask() {
+        maintenanceTask = new NukkitRunnable() {
+            @Override
+            public void run() {
+                long now = System.currentTimeMillis();
+
+                for (Iterator<Map.Entry<Long, Long>> it = processedProjectiles.entrySet().iterator(); it.hasNext(); ) {
+                    Map.Entry<Long, Long> entry = it.next();
+                    if (entry.getValue().longValue() <= now) {
+                        it.remove();
+                    }
+                }
+
+                for (Iterator<Map.Entry<Long, BeeRecord>> it = activeBees.entrySet().iterator(); it.hasNext(); ) {
+                    Map.Entry<Long, BeeRecord> entry = it.next();
+                    BeeRecord bee = entry.getValue();
+
+                    if (bee.expiresAtMillis <= now) {
+                        Entity entity = plugin.getServer().getLevelByName(bee.worldName) != null
+                                ? plugin.getServer().getLevelByName(bee.worldName).getEntity(entry.getKey())
+                                : null;
+                        despawnBee(entity, bee);
+                        it.remove();
+                        continue;
+                    }
+
+                    Entity entity = plugin.getServer().getLevelByName(bee.worldName) != null
+                            ? plugin.getServer().getLevelByName(bee.worldName).getEntity(entry.getKey())
+                            : null;
+                    if (entity == null || entity.isClosed() || !entity.isAlive()) {
+                        it.remove();
+                        continue;
+                    }
+
+                    sanitizeBeeTarget(entity, bee);
+                    retargetBee(entity, bee);
+                    protectOwnerFromPoison(bee);
+                }
+            }
+        };
+        maintenanceTask.runTaskTimer(plugin, 2, 2);
+    }
+
+    private void despawnBee(Entity entity, BeeRecord bee) {
+        if (entity != null && !entity.isClosed()) {
+            entity.close();
+        }
+        if (entity != null) {
+            activeBees.remove(entity.getId());
+        }
+    }
+
+    private static final class BeeRecord {
+        private final UUID ownerId;
+        private final String worldName;
+        private final long expiresAtMillis;
+        private final double searchRange;
+
+        private BeeRecord(UUID ownerId, String worldName, long expiresAtMillis, double searchRange) {
+            this.ownerId = ownerId;
+            this.worldName = worldName;
+            this.expiresAtMillis = expiresAtMillis;
+            this.searchRange = searchRange;
+        }
+    }
+        }
