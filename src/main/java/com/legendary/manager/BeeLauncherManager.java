@@ -181,6 +181,8 @@ public class BeeLauncherManager {
 
         Player target = (Player) event.getEntity();
         if (target.getUniqueId().equals(bee.ownerId)) {
+            clearBeeTarget(event.getDamager(), bee.ownerId);
+            protectOwnerFromPoison(bee);
             event.setCancelled();
             return;
         }
@@ -286,9 +288,15 @@ public class BeeLauncherManager {
         bee.namedTag.putString("legendary_owner", owner.getUniqueId().toString());
         bee.spawnToAll();
 
-        BeeRecord record = new BeeRecord(owner.getUniqueId(), owner.getLevel().getName(), expiresAt,
-                Math.max(6.0D, ability.getBeeSearchRange()));
+        BeeRecord record = new BeeRecord(
+                owner.getUniqueId(),
+                owner.getLevel().getName(),
+                expiresAt,
+                Math.max(6.0D, ability.getBeeSearchRange())
+        );
         activeBees.put(bee.getId(), record);
+
+        sanitizeBeeTarget(bee, record);
         retargetBee(bee, record);
     }
 
@@ -330,23 +338,147 @@ public class BeeLauncherManager {
         }
 
         Player target = findNearestTarget(bee, record.ownerId, record.searchRange);
-        setBeeAngry(bee, true);
         if (target == null) {
+            clearBeeTarget(bee, record.ownerId);
+
+            Player owner = findOnlineOwner(record.ownerId);
+            if (owner != null && owner.getLevel() == bee.getLevel() && owner.distanceSquared(bee) <= 4.0D) {
+                nudgeBeeAwayFromOwner(bee, owner);
+            }
+            return;
+        }
+
+        forceBeeTarget(bee, target);
+    }
+
+    private void sanitizeBeeTarget(Entity bee, BeeRecord record) {
+        if (bee == null || bee.isClosed()) {
+            return;
+        }
+
+        Player owner = findOnlineOwner(record.ownerId);
+        if (owner == null || owner.isClosed() || !owner.isAlive()) {
+            clearBeeTarget(bee, record.ownerId);
+            return;
+        }
+
+        if (owner.getLevel() != bee.getLevel()) {
+            clearBeeTarget(bee, record.ownerId);
+            return;
+        }
+
+        if (isTargetingOwner(bee, owner)) {
+            clearBeeTarget(bee, record.ownerId);
+
+            Player alt = findNearestTarget(bee, record.ownerId, record.searchRange);
+            if (alt != null) {
+                forceBeeTarget(bee, alt);
+            } else {
+                nudgeBeeAwayFromOwner(bee, owner);
+            }
+            return;
+        }
+
+        if (owner.distanceSquared(bee) <= 4.0D) {
+            nudgeBeeAwayFromOwner(bee, owner);
+        }
+    }
+
+    private Player findOnlineOwner(UUID ownerId) {
+        for (Player player : plugin.getServer().getOnlinePlayers().values()) {
+            if (player != null && ownerId.equals(player.getUniqueId())) {
+                return player;
+            }
+        }
+        return null;
+    }
+
+    private boolean isTargetingOwner(Entity bee, Player owner) {
+        if (bee == null || owner == null) {
+            return false;
+        }
+
+        try {
+            Field targetField = Entity.class.getField("targetEntity");
+            Object target = targetField.get(bee);
+            if (target instanceof Entity && ((Entity) target).getId() == owner.getId()) {
+                return true;
+            }
+        } catch (Exception ignored) {
+        }
+
+        try {
+            Field angryTo = bee.getClass().getField("isAngryTo");
+            Object value = angryTo.get(bee);
+            if (value instanceof Number && ((Number) value).longValue() == owner.getId()) {
+                return true;
+            }
+        } catch (Exception ignored) {
+        }
+
+        Object memoryTarget = readMemory(bee, "ATTACK_TARGET");
+        return memoryTarget instanceof Entity && ((Entity) memoryTarget).getId() == owner.getId();
+    }
+
+    private void clearBeeTarget(Entity bee, UUID ownerId) {
+        if (bee == null) {
             return;
         }
 
         try {
-            Method setTarget = bee.getClass().getMethod("setTarget", Entity.class);
-            setTarget.invoke(bee, target);
+            Field targetField = Entity.class.getField("targetEntity");
+            Object target = targetField.get(bee);
+            if (target == null || !(target instanceof Entity)
+                    || ownerId.equals(((Entity) target).getUniqueId())) {
+                targetField.set(bee, null);
+            }
         } catch (Exception ignored) {
-            // old or different API
         }
+
+        try {
+            Field angryTo = bee.getClass().getField("isAngryTo");
+            Object value = angryTo.get(bee);
+            if (value instanceof Number && ((Number) value).longValue() >= 0L) {
+                angryTo.setLong(bee, -1L);
+            }
+        } catch (Exception ignored) {
+        }
+
+        clearMemory(bee, "ATTACK_TARGET");
+        setBeeAngry(bee, false);
+    }
+
+    private void forceBeeTarget(Entity bee, Entity target) {
+        if (bee == null || target == null) {
+            return;
+        }
+
+        try {
+            Method method = bee.getClass().getMethod("setAngryOnTarget", Entity.class);
+            method.invoke(bee, target);
+            return;
+        } catch (Exception ignored) {
+        }
+
+        try {
+            Method method = bee.getClass().getMethod("setTarget", Entity.class);
+            method.invoke(bee, target);
+        } catch (Exception ignored) {
+        }
+
+        try {
+            Field targetField = Entity.class.getField("targetEntity");
+            targetField.set(bee, target);
+        } catch (Exception ignored) {
+        }
+
+        writeMemory(bee, "ATTACK_TARGET", target);
+        setBeeAngry(bee, true);
 
         try {
             Field angryTo = bee.getClass().getField("isAngryTo");
             angryTo.setLong(bee, target.getId());
         } catch (Exception ignored) {
-            // optional field
         }
     }
 
@@ -386,90 +518,57 @@ public class BeeLauncherManager {
         return best;
     }
 
-    private LegendaryWeaponDefinition resolveDefinition(EntityProjectile projectile) {
-        if (projectile == null || projectile.namedTag == null || !projectile.namedTag.contains("legendary_id")) {
-            return null;
-        }
-        return plugin.getItemManager().getDefinition(projectile.namedTag.getString("legendary_id"));
-    }
+    private Object readMemory(Entity bee, String memoryName) {
+        try {
+            Object storage = getMemoryStorage(bee);
+            Object memoryType = getCoreMemoryType(memoryName);
+            if (storage == null || memoryType == null) {
+                return null;
+            }
 
-    private boolean isBeeProjectile(EntityProjectile projectile) {
-        return projectile != null
-                && projectile.namedTag != null
-                && projectile.namedTag.getBoolean(BEE_PROJECTILE_TAG);
-    }
-
-    private boolean markProjectileProcessed(long projectileId) {
-        long now = System.currentTimeMillis();
-        Long existing = processedProjectiles.get(projectileId);
-        if (existing != null && existing.longValue() > now) {
-            return false;
-        }
-        processedProjectiles.put(projectileId, now + 15000L);
-        return true;
-    }
-
-    private void startMaintenanceTask() {
-        maintenanceTask = new NukkitRunnable() {
-            @Override
-            public void run() {
-                long now = System.currentTimeMillis();
-
-                for (Iterator<Map.Entry<Long, Long>> it = processedProjectiles.entrySet().iterator(); it.hasNext(); ) {
-                    Map.Entry<Long, Long> entry = it.next();
-                    if (entry.getValue().longValue() <= now) {
-                        it.remove();
-                    }
-                }
-
-                for (Iterator<Map.Entry<Long, BeeRecord>> it = activeBees.entrySet().iterator(); it.hasNext(); ) {
-                    Map.Entry<Long, BeeRecord> entry = it.next();
-                    BeeRecord bee = entry.getValue();
-
-                    if (bee.expiresAtMillis <= now) {
-                        Entity entity = plugin.getServer().getLevelByName(bee.worldName) != null
-                                ? plugin.getServer().getLevelByName(bee.worldName).getEntity(entry.getKey())
-                                : null;
-                        despawnBee(entity, bee);
-                        it.remove();
-                        continue;
-                    }
-
-                    Entity entity = plugin.getServer().getLevelByName(bee.worldName) != null
-                            ? plugin.getServer().getLevelByName(bee.worldName).getEntity(entry.getKey())
-                            : null;
-                    if (entity == null || entity.isClosed() || !entity.isAlive()) {
-                        it.remove();
-                        continue;
-                    }
-
-                    retargetBee(entity, bee);
+            for (Method method : storage.getClass().getMethods()) {
+                if ("get".equals(method.getName()) && method.getParameterTypes().length == 1) {
+                    return method.invoke(storage, memoryType);
                 }
             }
-        };
-        maintenanceTask.runTaskTimer(plugin, 10, 10);
+        } catch (Exception ignored) {
+        }
+        return null;
     }
 
-    private void despawnBee(Entity entity, BeeRecord bee) {
-        if (entity != null && !entity.isClosed()) {
-            entity.close();
-        }
-        if (entity != null) {
-            activeBees.remove(entity.getId());
-        }
-    }
-
-    private static final class BeeRecord {
-        private final UUID ownerId;
-        private final String worldName;
-        private final long expiresAtMillis;
-        private final double searchRange;
-
-        private BeeRecord(UUID ownerId, String worldName, long expiresAtMillis, double searchRange) {
-            this.ownerId = ownerId;
-            this.worldName = worldName;
-            this.expiresAtMillis = expiresAtMillis;
-            this.searchRange = searchRange;
-        }
-    }
+    private void writeMemory(Entity bee, String memoryName, Object value) {
+        try {
+            Object storage = getMemoryStorage(bee);
+            Object memoryType = getCoreMemoryType(memoryName);
+            if (storage == null || memoryType == null) {
+                return;
             }
+
+            for (Method method : storage.getClass().getMethods()) {
+                if ("put".equals(method.getName()) && method.getParameterTypes().length == 2) {
+                    method.invoke(storage, memoryType, value);
+                    return;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void clearMemory(Entity bee, String memoryName) {
+        try {
+            Object storage = getMemoryStorage(bee);
+            Object memoryType = getCoreMemoryType(memoryName);
+            if (storage == null || memoryType == null) {
+                return;
+            }
+
+            for (Method method : storage.getClass().getMethods()) {
+                if ("clear".equals(method.getName()) && method.getParameterTypes().length == 1) {
+                    method.invoke(storage, memoryType);
+                    return;
+                }
+            }
+
+            for (Method method : storage.getClass().getMethods()) {
+                if ("put".equals(method.getName()) && method.getParameterTypes().length == 2) {
+                    method.invoke(storage, me
