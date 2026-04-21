@@ -35,7 +35,7 @@ public class LegendaryWeaponDefinition {
         this.type = type == null ? "UNKNOWN" : type.toUpperCase();
         this.material = material;
         this.displayName = displayName;
-        this.lore = lore == null ? Collections.<String>emptyList() : Collections.unmodifiableList(new ArrayList<>(lore));
+        this.lore = lore == null ? Collections.<String>emptyList() : Collections.unmodifiableList(new ArrayList<String>(lore));
         this.unbreakable = unbreakable;
         this.recipe = recipe;
         this.ability = ability;
@@ -97,6 +97,10 @@ public class LegendaryWeaponDefinition {
         return "DEATH_NOTE".equalsIgnoreCase(type) || "NOTEBOOK".equalsIgnoreCase(type);
     }
 
+    public boolean isBeeLauncher() {
+        return "BEE_LAUNCHER".equalsIgnoreCase(type) || "BEE_GUN".equalsIgnoreCase(type);
+    }
+
     public static class RecipeDefinition {
 
         private final boolean enabled;
@@ -105,10 +109,10 @@ public class LegendaryWeaponDefinition {
 
         public RecipeDefinition(boolean enabled, List<String> shape, Map<Character, String> ingredients) {
             this.enabled = enabled;
-            this.shape = shape == null ? Collections.<String>emptyList() : Collections.unmodifiableList(new ArrayList<>(shape));
+            this.shape = shape == null ? Collections.<String>emptyList() : Collections.unmodifiableList(new ArrayList<String>(shape));
             this.ingredients = ingredients == null
                     ? Collections.<Character, String>emptyMap()
-                    : Collections.unmodifiableMap(new LinkedHashMap<>(ingredients));
+                    : Collections.unmodifiableMap(new LinkedHashMap<Character, String>(ingredients));
         }
 
         public boolean isEnabled() {
@@ -162,6 +166,11 @@ public class LegendaryWeaponDefinition {
         private final boolean onlySurvivalTargets;
         private final boolean bindToCraftWorld;
 
+        private final int beeCountMin;
+        private final int beeCountMax;
+        private final double beeSearchRange;
+        private final double beeSpawnRadius;
+
         public AbilityDefinition(int cooldownTicks,
                                  double projectileSpeed,
                                  double pullSpeed,
@@ -192,7 +201,11 @@ public class LegendaryWeaponDefinition {
                                  int targetSlownessAmplifier,
                                  int attempts,
                                  boolean onlySurvivalTargets,
-                                 boolean bindToCraftWorld) {
+                                 boolean bindToCraftWorld,
+                                 int beeCountMin,
+                                 int beeCountMax,
+                                 double beeSearchRange,
+                                 double beeSpawnRadius) {
             this.cooldownTicks = cooldownTicks;
             this.projectileSpeed = projectileSpeed;
             this.pullSpeed = pullSpeed;
@@ -214,7 +227,7 @@ public class LegendaryWeaponDefinition {
             this.allowRetarget = allowRetarget;
             this.mirroredCauses = mirroredCauses == null
                     ? Collections.<String>emptyList()
-                    : Collections.unmodifiableList(new ArrayList<>(mirroredCauses));
+                    : Collections.unmodifiableList(new ArrayList<String>(mirroredCauses));
             this.rayRange = rayRange;
             this.rayStep = rayStep;
             this.selfHeightBlocks = selfHeightBlocks;
@@ -226,6 +239,10 @@ public class LegendaryWeaponDefinition {
             this.attempts = attempts;
             this.onlySurvivalTargets = onlySurvivalTargets;
             this.bindToCraftWorld = bindToCraftWorld;
+            this.beeCountMin = beeCountMin;
+            this.beeCountMax = beeCountMax;
+            this.beeSearchRange = beeSearchRange;
+            this.beeSpawnRadius = beeSpawnRadius;
         }
 
         public int getCooldownTicks() {
@@ -350,6 +367,22 @@ public class LegendaryWeaponDefinition {
 
         public boolean isBindToCraftWorld() {
             return bindToCraftWorld;
+        }
+
+        public int getBeeCountMin() {
+            return beeCountMin;
+        }
+
+        public int getBeeCountMax() {
+            return beeCountMax;
+        }
+
+        public double getBeeSearchRange() {
+            return beeSearchRange;
+        }
+
+        public double getBeeSpawnRadius() {
+            return beeSpawnRadius;
         }
     }
 }
